@@ -59,9 +59,18 @@ h1, h2, h3, h4, h5, h6 {
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"] {
     background-color: var(--dtt-white) !important;
+    padding-top: 0 !important;
 }
 
-/* ── 5. Sidebar ── */
+/* ── 5. Header bar — hidden ── */
+[data-testid="stHeader"] {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+}
+
+/* ── 6. Sidebar ── */
 [data-testid="stSidebar"] {
     background-color: #FAFAFA !important;
     border-right: 1px solid var(--dtt-grey-border) !important;
@@ -74,7 +83,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--dtt-black) !important;
 }
 
-/* ── 6. Input fields ── */
+/* ── 7. Input fields ── */
 input[type="text"],
 input[type="password"],
 textarea,
@@ -105,7 +114,7 @@ input::placeholder { color: #AAAAAA !important; }
     letter-spacing: 0.3px;
 }
 
-/* ── 7. Metric cards ── */
+/* ── 8. Metric cards ── */
 [data-testid="stMetric"] {
     background: var(--dtt-white) !important;
     border: 1px solid var(--dtt-grey-border) !important;
@@ -126,7 +135,7 @@ input::placeholder { color: #AAAAAA !important; }
 }
 [data-testid="stMetricDelta"] { font-weight: 600 !important; }
 
-/* ── 8. Buttons ── */
+/* ── 9. Buttons — secondary ── */
 .stButton > button {
     border-radius: 6px !important;
     font-weight: 700 !important;
@@ -158,7 +167,24 @@ input::placeholder { color: #AAAAAA !important; }
     color: var(--dtt-green-dark) !important;
 }
 
-/* ── 9. Radio nav buttons ── */
+/* ── 10. Form submit button — green, never red ── */
+[data-testid="stFormSubmitButton"] > button {
+    background-color: var(--dtt-green) !important;
+    color: var(--dtt-black) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+    width: 100% !important;
+    transition: all 0.18s ease !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+    background-color: var(--dtt-green-dark) !important;
+    color: var(--dtt-white) !important;
+    box-shadow: 0 4px 12px rgba(134, 188, 37, 0.35) !important;
+}
+
+/* ── 11. Radio nav buttons ── */
 .stRadio {
     margin-top: -8px !important;
     margin-bottom: 8px !important;
@@ -197,7 +223,7 @@ div[role="radiogroup"] input[type="radio"] {
     accent-color: var(--dtt-green) !important;
 }
 
-/* ── 10. Alerts ── */
+/* ── 12. Alerts ── */
 [data-testid="stAlert"][data-type="success"],
 .stSuccess > div {
     background-color: var(--dtt-green-light) !important;
@@ -227,27 +253,42 @@ div[role="radiogroup"] input[type="radio"] {
     border-radius: 6px !important;
 }
 
-/* ── 11. Dividers ── */
+/* ── 13. Spinner — always visible ── */
+[data-testid="stSpinner"],
+[data-testid="stSpinner"] * {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+[data-testid="stSpinner"] p,
+[data-testid="stSpinner"] span {
+    color: var(--dtt-black) !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+/* ── 14. Dividers ── */
 hr {
     border: none !important;
     border-top: 1px solid var(--dtt-grey-border) !important;
     margin: 14px 0 !important;
 }
 
-/* ── 12. Caption / small text ── */
-.stCaption, [data-testid="stCaptionContainer"] {
+/* ── 15. Caption / small text ── */
+.stCaption,
+[data-testid="stCaptionContainer"] {
     color: #777777 !important;
     font-size: 0.78rem !important;
 }
 
-/* ── 13. Selectbox / dropdown ── */
+/* ── 16. Selectbox / dropdown ── */
 [data-testid="stSelectbox"] > div > div {
     border: 1.5px solid var(--dtt-grey-border) !important;
     border-radius: 6px !important;
     background-color: var(--dtt-white) !important;
 }
 
-/* ── 14. Tabs (st.tabs widget) ── */
+/* ── 17. Tabs (st.tabs widget) ── */
 [data-testid="stTabs"] {
     display: block !important;
     visibility: visible !important;
@@ -288,25 +329,33 @@ hr {
     padding-top: 20px !important;
 }
 
-/* ── 15. Hide Streamlit branding ── */
+/* ── 18. Hide Streamlit branding ── */
 #MainMenu            { display: none !important; }
 footer               { display: none !important; }
 [data-testid="stToolbar"]    { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
-/* ── 16. Hide multipage nav (sidebar only) ── */
+/* ── 19. Hide multipage nav (sidebar only) ── */
 [data-testid="stSidebarNav"]      { display: none !important; }
 [data-testid="stSidebarNavItems"] { display: none !important; }
 
-/* ── 17. Sidebar toggle buttons ── */
-/* Hide only the collapse arrow INSIDE the open sidebar */
+/* ── 20. Sidebar toggle ── */
 button[data-testid="baseButton-headerNoPadding"] {
     display: none !important;
 }
-/* Always keep the reopen arrow > visible when sidebar is closed */
 [data-testid="stSidebarCollapsedControl"] {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: all !important;
+}
+
+/* ── 21. Hide third-party badges ── */
+[class*="badge"],
+[class*="Badge"],
+[class*="watermark"],
+iframe[height="55"],
+iframe[width="55"],
+iframe[style*="position: fixed"] {
+    display: none !important;
 }

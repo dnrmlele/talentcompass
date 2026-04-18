@@ -298,9 +298,16 @@ footer               { display: none !important; }
 [data-testid="stSidebarNav"]      { display: none !important; }
 [data-testid="stSidebarNavItems"] { display: none !important; }
 
-/* ── 17. Hide sidebar collapse button ── */
-[data-testid="stSidebar"] button[aria-label*="sidebar"],
-[data-testid="stSidebar"] button[aria-label*="Collapse"],
-[data-testid="stSidebar"] button[aria-label*="Expand"] {
+/* ── 17. Hide only the collapse button INSIDE the sidebar ── */
+/* Le bouton "fermer" à l'intérieur de la sidebar */
+[data-testid="stSidebar"] button[aria-label="Collapse sidebar"],
+[data-testid="stSidebar"] button[aria-label="collapse sidebar"] {
     display: none !important;
+}
+
+/* Le bouton "ouvrir" hors sidebar — on le garde visible */
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }

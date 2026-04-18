@@ -60,9 +60,17 @@ PRESETS = {
 
 SCORE_COLORS = {
     "Fully Automatable": "#01696f",
-    "AI-Augmented": "#d19900",
-    "Human-Only": "#8a8a8a",
+    "AI-Augmented":      "#d19900",
+    "Human-Only":        "#8a8a8a",
 }
+
+# ── Shared Plotly layout defaults ─────────────────────────────────────────────
+_PLOTLY_BASE = dict(
+    template="plotly_white",
+    paper_bgcolor="white",
+    plot_bgcolor="white",
+    font=dict(color="#1A1A1A", family="Cabinet Grotesk, sans-serif", size=12),
+)
 
 
 def _apply_role_preset() -> None:
@@ -71,16 +79,16 @@ def _apply_role_preset() -> None:
         return
     p = PRESETS[sel]
     st.session_state["rj_title"] = p["title"]
-    st.session_state["rj_dept"] = p["dept"]
-    st.session_state["rj_desc"] = p["desc"]
+    st.session_state["rj_dept"]  = p["dept"]
+    st.session_state["rj_desc"]  = p["desc"]
 
 
 def _init_role_inputs() -> None:
     for key, default in (
         ("rj_client", ""),
-        ("rj_title", ""),
-        ("rj_dept", ""),
-        ("rj_desc", ""),
+        ("rj_title",  ""),
+        ("rj_dept",   ""),
+        ("rj_desc",   ""),
     ):
         if key not in st.session_state:
             st.session_state[key] = default
@@ -104,16 +112,7 @@ def render():
 
     _init_role_inputs()
 
-    st.selectbox(
-        "Load a preset role",
-        ["- none -"] + list(PRESETS.keys()),
-        key="role_preset_select",
-        on_change=_apply_role_preset,
-        help="Fills Job Title, Department, and Job Description immediately. You can edit before analyzing.",
-    )
-
     col1, col2 = st.columns([1, 1])
-
     with col1:
         st.text_input(
             "Client Name",
@@ -133,6 +132,13 @@ def render():
                 f"From latest **Client Research** on *{rcn}*: suggested size **{rcb}**. "
                 "Change above if needed."
             )
+        st.selectbox(
+            "Load a preset role",
+            ["- none -"] + list(PRESETS.keys()),
+            key="role_preset_select",
+            on_change=_apply_role_preset,
+            help="Fills Job Title, Department, and Job Description immediately.",
+        )
 
     st.text_area(
         "Job Description *",
@@ -154,26 +160,24 @@ def render():
             st.error("Enter your Claude API key in the sidebar first.")
             return
 
-        job_title = (st.session_state.get("rj_title") or "").strip()
-        job_desc = (st.session_state.get("rj_desc") or "").strip()
+        job_title  = (st.session_state.get("rj_title") or "").strip()
+        job_desc   = (st.session_state.get("rj_desc")  or "").strip()
         preset_sel = st.session_state.get("role_preset_select", "- none -")
 
         if preset_sel != "- none -":
             p = PRESETS[preset_sel]
-            if not job_title:
-                job_title = p["title"]
-            if not job_desc:
-                job_desc = p["desc"]
+            if not job_title: job_title = p["title"]
+            if not job_desc:  job_desc  = p["desc"]
 
         department = (st.session_state.get("rj_dept") or "").strip()
         if preset_sel != "- none -" and not department:
             department = PRESETS[preset_sel]["dept"]
 
         if not job_title or not job_desc:
-            st.error("Job Title and Job Description are required (load a preset or enter them manually).")
+            st.error("Job Title and Job Description are required.")
             return
 
-        client_name = (st.session_state.get("rj_client") or "").strip()
+        client_name  = (st.session_state.get("rj_client") or "").strip()
         company_size = st.session_state.get("role_company_size", "SME")
         if company_size not in SIZE_OPTIONS:
             company_size = "SME"
@@ -188,8 +192,8 @@ def render():
                     job_description=job_desc,
                     client_name=client_name,
                 )
-                result["_title"] = job_title
-                result["_dept"] = department
+                result["_title"]  = job_title
+                result["_dept"]   = department
                 result["_client"] = client_name or "Not specified"
                 st.session_state["last_role_result"] = result
                 if "org_roles" not in st.session_state:
@@ -205,30 +209,33 @@ def render():
 
     st.divider()
 
+    # ── Header metrics ────────────────────────────────────────────────────────
     col_h1, col_h2, col_h3, col_h4 = st.columns(4)
     with col_h1:
         st.markdown(f"### {r.get('_title', '')}")
         st.caption(f"{r.get('_dept', '')}  -  {r.get('_client', '')}")
     with col_h2:
-        priority = r.get("transformation_priority", "Medium")
-        st.metric("Transformation Priority", priority)
+        st.metric("Transformation Priority", r.get("transformation_priority", "Medium"))
     with col_h3:
         st.metric("Automation Score", f"{r.get('automation_score', 0)}%")
     with col_h4:
         st.metric("Weekly Hours Saved", f"{r.get('weekly_hours_saved', 0)} hrs")
 
+    # ── Executive summary ─────────────────────────────────────────────────────
     with st.container(border=True):
         st.markdown("**Executive Summary**")
         st.write(r.get("summary", ""))
         st.caption("Live Claude assessment  -  Generated from your exact role description")
 
+    # ── Stat metrics ──────────────────────────────────────────────────────────
     stats = r.get("stats", {})
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Fully Automatable", f"{stats.get('fully_automatable_pct', 0)}%")
-    c2.metric("AI-Augmented", f"{stats.get('ai_augmented_pct', 0)}%")
-    c3.metric("Human-Only", f"{stats.get('human_only_pct', 0)}%")
+    c2.metric("AI-Augmented",      f"{stats.get('ai_augmented_pct', 0)}%")
+    c3.metric("Human-Only",        f"{stats.get('human_only_pct', 0)}%")
     c4.metric("AI Agents Identified", len(r.get("ai_agents", [])))
 
+    # ── Gauge + Task bar chart ────────────────────────────────────────────────
     tasks = r.get("tasks", [])
     col_gauge, col_tasks = st.columns([1, 2])
 
@@ -240,18 +247,22 @@ def render():
             value=score,
             gauge={
                 "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#7a7974"},
-                "bar": {"color": gauge_color},
-                "bgcolor": "#f3f0ec",
+                "bar":  {"color": gauge_color},
+                "bgcolor": "#F7F7F7",
                 "steps": [
-                    {"range": [0, 45], "color": "#e6f4f4"},
-                    {"range": [45, 70], "color": "#fef6e0"},
-                    {"range": [70, 100], "color": "#f5dded"},
+                    {"range": [0,   45],  "color": "#e6f4f4"},
+                    {"range": [45,  70],  "color": "#fef6e0"},
+                    {"range": [70, 100],  "color": "#f5dded"},
                 ],
             },
-            title={"text": "Automation Score"},
-            number={"suffix": "%", "font": {"size": 36}},
+            title={"text": "Automation Score", "font": {"color": "#1A1A1A", "size": 14}},
+            number={"suffix": "%", "font": {"size": 36, "color": "#1A1A1A"}},
         ))
-        fig_gauge.update_layout(height=280, margin=dict(t=40, b=0, l=20, r=20))
+        fig_gauge.update_layout(
+            height=280,
+            margin=dict(t=40, b=0, l=20, r=20),
+            **_PLOTLY_BASE,
+        )
         st.plotly_chart(fig_gauge, use_container_width=True)
 
     with col_tasks:
@@ -267,21 +278,32 @@ def render():
                 height=max(250, len(tasks) * 42),
             )
             fig_tasks.update_traces(texttemplate="%{text}%", textposition="outside")
-            fig_tasks.update_layout(margin=dict(l=0, r=30, t=10, b=0), legend=dict(orientation="h", y=-0.15))
+            fig_tasks.update_layout(
+                margin=dict(l=0, r=30, t=10, b=0),
+                legend=dict(orientation="h", y=-0.15, font=dict(color="#1A1A1A")),
+                xaxis=dict(color="#1A1A1A", gridcolor="#EEEEEE"),
+                yaxis=dict(color="#1A1A1A", tickfont=dict(color="#1A1A1A")),
+                **_PLOTLY_BASE,
+            )
             st.plotly_chart(fig_tasks, use_container_width=True)
 
+    # ── Task-by-task rationale ────────────────────────────────────────────────
     with st.expander("Task-by-task rationale"):
         for t in tasks:
-            color = SCORE_COLORS.get(t.get("type", ""), "#999")
+            color = SCORE_COLORS.get(t.get("type", ""), "#555555")
             st.markdown(
-                f"**{t.get('name', '')}** - "
-                f"<span style='color:{color};font-weight:600'>{t.get('type', '')}</span> "
-                f"({t.get('score', 0)}%)  -  {t.get('rationale', '')}",
+                f"<span style='color:#1A1A1A;font-weight:600'>{t.get('name', '')}</span>"
+                f" &mdash; "
+                f"<span style='color:{color};font-weight:600'>{t.get('type', '')}</span>"
+                f" <span style='color:#555555'>({t.get('score', 0)}%)</span>"
+                f"<br><span style='color:#1A1A1A'>{t.get('rationale', '')}</span>",
                 unsafe_allow_html=True,
             )
+            st.divider()
 
+    # ── AI Agents ─────────────────────────────────────────────────────────────
     st.markdown("### Recommended AI Agents")
-    agents = r.get("ai_agents", [])
+    agents     = r.get("ai_agents", [])
     agent_cols = st.columns(min(len(agents), 3)) if agents else []
     for i, agent in enumerate(agents):
         with agent_cols[i % 3] if agent_cols else st.container():
@@ -292,6 +314,7 @@ def render():
                 st.markdown(f"**Saving:** `{agent.get('time_saving', '')}`")
                 st.markdown(f"**Setup complexity:** `{agent.get('setup_complexity', '')}`")
 
+    # ── Reskilling ────────────────────────────────────────────────────────────
     st.markdown("### Reskilling Priorities")
     reskilling = r.get("reskilling", {})
     col_dev, col_ret = st.columns(2)
@@ -306,10 +329,11 @@ def render():
             for skill in reskilling.get("retain", []):
                 st.markdown(f"- {skill}")
 
+    # ── Transformation Roadmap ────────────────────────────────────────────────
     st.markdown("### Transformation Roadmap")
-    roadmap = r.get("roadmap", [])
+    roadmap      = r.get("roadmap", [])
     phase_colors = ["#01696f", "#d19900", "#006494"]
-    road_cols = st.columns(len(roadmap)) if roadmap else []
+    road_cols    = st.columns(len(roadmap)) if roadmap else []
     for i, phase in enumerate(roadmap):
         with road_cols[i] if road_cols else st.container():
             with st.container(border=True):
@@ -322,10 +346,11 @@ def render():
                 for item in phase.get("items", []):
                     st.markdown(f"- {item}")
 
+    # ── Risk & Change Management ──────────────────────────────────────────────
     st.markdown("### Risk & Change Management")
-    risks = r.get("risks", [])
+    risks       = r.get("risks", [])
     risk_colors = {"change": "#964219", "data": "#da7101", "compliance": "#006494"}
-    risk_cols = st.columns(len(risks)) if risks else []
+    risk_cols   = st.columns(len(risks)) if risks else []
     for i, risk in enumerate(risks):
         with risk_cols[i] if risk_cols else st.container():
             with st.container(border=True):

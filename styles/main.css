@@ -294,20 +294,19 @@ footer               { display: none !important; }
 [data-testid="stToolbar"]    { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 
-/* ── 16. Hide multipage nav (scoped to sidebar only) ── */
+/* ── 16. Hide multipage nav (sidebar only) ── */
 [data-testid="stSidebarNav"]      { display: none !important; }
 [data-testid="stSidebarNavItems"] { display: none !important; }
 
-/* ── 17. Hide only the collapse button INSIDE the sidebar ── */
-/* Le bouton "fermer" à l'intérieur de la sidebar */
-[data-testid="stSidebar"] button[aria-label="Collapse sidebar"],
-[data-testid="stSidebar"] button[aria-label="collapse sidebar"] {
+/* ── 17. Sidebar toggle buttons ── */
+/* Hide only the collapse arrow INSIDE the open sidebar */
+button[data-testid="baseButton-headerNoPadding"] {
     display: none !important;
 }
-
-/* Le bouton "ouvrir" hors sidebar — on le garde visible */
+/* Always keep the reopen arrow > visible when sidebar is closed */
 [data-testid="stSidebarCollapsedControl"] {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+    pointer-events: all !important;
 }

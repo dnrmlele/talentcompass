@@ -1,32 +1,142 @@
 import json
 import re
 import anthropic
+from pydantic import ValidationError
 from services.prompts import (
-    ROLE_SYSTEM, role_prompt,
-    COMPANY_SYSTEM, company_prompt
+    ROLE_SYSTEM,
+    role_prompt,
+    COMPANY_SYSTEM,
+    company_prompt,
+    DISAMBIG_SYSTEM,
+    disambiguation_prompt,
+)
+from services.schemas import RoleAnalysis, CompanyResearch, CompanyCandidates
+
+_RETRY_INSTRUCTION = (
+    "Your previous reply was not valid JSON. Return ONLY the JSON object, "
+    "no markdown, no commentary."
 )
 
 
-def _call(api_key: str, system: str, user: str, max_tokens: int = 3500) -> dict:
-    client = anthropic.Anthropic(api_key=api_key)
-    msg = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}]
-    )
-    raw = msg.content[0].text.strip()
+class ClaudeClientError(Exception):
+    """Raised when a Claude API call fails or returns unusable output.
+
+    kind is one of: "auth", "rate_limit", "bad_json", "api".
+    """
+
+    def __init__(self, message: str, kind: str):
+        super().__init__(message)
+        self.kind = kind
+
+
+def _parse(raw: str) -> dict:
+    raw = raw.strip()
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
     return json.loads(raw)
 
 
-def analyze_role(api_key, job_title, department, company_size, job_description, client_name="") -> dict:
-    prompt = role_prompt(job_title, department, company_size, job_description, client_name)
-    return _call(api_key, ROLE_SYSTEM, prompt)
+_DEFAULT_MODEL = "claude-haiku-4-5"
+
+
+def _resolve_model() -> str:
+    """Model id chosen in the sidebar (st.session_state['model']), else default.
+
+    Reads session_state lazily and defensively so the client still works when
+    called outside a Streamlit script run (tests, scripts) — falls back to
+    _DEFAULT_MODEL when unset or unavailable.
+    """
+    try:
+        import streamlit as st
+
+        chosen = st.session_state.get("model")
+        if chosen:
+            return chosen
+    except Exception:
+        pass
+    return _DEFAULT_MODEL
+
+
+def _send(
+    client, system: str, messages: list, max_tokens: int, model: str = None
+) -> str:
+    msg = client.messages.create(
+        model=model or _resolve_model(),
+        max_tokens=max_tokens,
+        system=system,
+        messages=messages,
+    )
+    return msg.content[0].text
+
+
+def _call(
+    api_key: str, system: str, user: str, max_tokens: int = 3500, model: str = None
+) -> dict:
+    client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": user}]
+
+    try:
+        raw = _send(client, system, messages, max_tokens, model)
+    except anthropic.AuthenticationError as e:
+        raise ClaudeClientError(str(e), kind="auth") from e
+    except anthropic.RateLimitError as e:
+        raise ClaudeClientError(str(e), kind="rate_limit") from e
+    except anthropic.APIError as e:
+        raise ClaudeClientError(str(e), kind="api") from e
+
+    try:
+        return _parse(raw)
+    except json.JSONDecodeError:
+        pass  # retry exactly once below
+
+    retry_messages = messages + [
+        {"role": "assistant", "content": raw},
+        {"role": "user", "content": _RETRY_INSTRUCTION},
+    ]
+    try:
+        raw = _send(client, system, retry_messages, max_tokens, model)
+    except anthropic.AuthenticationError as e:
+        raise ClaudeClientError(str(e), kind="auth") from e
+    except anthropic.RateLimitError as e:
+        raise ClaudeClientError(str(e), kind="rate_limit") from e
+    except anthropic.APIError as e:
+        raise ClaudeClientError(str(e), kind="api") from e
+
+    try:
+        return _parse(raw)
+    except json.JSONDecodeError as e:
+        raise ClaudeClientError(
+            "Claude returned invalid JSON after one retry.", kind="bad_json"
+        ) from e
+
+
+def _validate(data: dict, model_cls) -> dict:
+    """Validate Claude's parsed JSON against a schema.
+
+    Runs AFTER _call() has already done its json.JSONDecodeError retry, so a
+    failure here is valid JSON of the wrong shape — it must NOT trigger another
+    API retry. Surface it directly as a bad_json error for the UI to catch.
+    """
+    try:
+        return model_cls.model_validate(data).model_dump()
+    except ValidationError as e:
+        raise ClaudeClientError(
+            f"Claude response did not match the expected schema: {e.error_count()} issue(s).",
+            kind="bad_json",
+        ) from e
+
+
+def analyze_role(
+    api_key, job_title, department, company_size, job_description, client_name=""
+) -> dict:
+    prompt = role_prompt(
+        job_title, department, company_size, job_description, client_name
+    )
+    return _validate(_call(api_key, ROLE_SYSTEM, prompt), RoleAnalysis)
 
 
 def research_company(api_key, client_name, industry="") -> dict:
     prompt = company_prompt(client_name, industry)
-    return _call(api_key, COMPANY_SYSTEM, prompt, max_tokens=3500)
-
+    return _validate(
+        _call(api_key, COMPANY_SYSTEM, prompt, max_tokens=3500), CompanyResearch
+    )

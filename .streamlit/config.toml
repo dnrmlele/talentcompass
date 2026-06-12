@@ -1,0 +1,14 @@
+[theme]
+# Pin to the light theme the custom Deloitte CSS (styles/main.css) was designed
+# against. Without this, Streamlit follows the OS/browser theme; in dark mode the
+# base widgets render dark while the CSS forces black text on white -> unreadable
+# white-on-white / black-on-black on widgets the CSS doesn't explicitly target.
+base = "light"
+primaryColor = "#86BC25"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FAFAFA"
+textColor = "#1A1A1A"
+
+[server]
+headless = true
+port = 8501

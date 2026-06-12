@@ -83,3 +83,17 @@ All roles analyzed during the session are automatically collected and visualized
 - API key is session-only and never stored
 - All role and company assessments are dynamically generated — no hardcoded scores
 - Presets are helper input templates only; the actual analysis is always live
+
+---
+
+## Development
+
+- **Hot reload (`TC_DEV`):** `app.py` can reload service/page submodules on each Streamlit rerun so code edits apply without restarting the server. This is **off by default** (it adds overhead and can cause stale-module state). Enable it only while iterating locally:
+  ```bash
+  # macOS / Linux
+  TC_DEV=1 streamlit run app.py
+  # Windows PowerShell
+  $env:TC_DEV=1; streamlit run app.py
+  ```
+  Leave `TC_DEV` unset in any shared or production deployment.
+- **Tests:** `pip install -r requirements-dev.txt` then `pytest` from the repo root.

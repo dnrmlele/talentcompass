@@ -2,8 +2,20 @@ import copy
 
 import streamlit as st
 import plotly.graph_objects as go
-from services.claude_client import research_company
+from services.claude_client import research_company, ClaudeClientError
 from services.company_context import inferred_size_to_company_size
+from services.prompts import MARKETS
+
+
+def _market_label(key: str) -> str:
+    return f"{key} (beta)" if MARKETS[key].get("beta") else key
+
+_ERROR_MESSAGES = {
+    "auth": "Invalid Claude API key. Check the key in the sidebar and try again.",
+    "rate_limit": "Claude is rate-limited right now. Wait a moment and retry.",
+    "bad_json": "Claude returned an unreadable response. Please retry the research.",
+    "api": "Claude API call failed. Check your connection and try again.",
+}
 
 
 def render():
@@ -25,6 +37,15 @@ def render():
                 "Industry",
                 placeholder="e.g. Fund Administration, Banking, Legal - leave blank to auto-infer",
             )
+        market = st.selectbox(
+            "Market",
+            list(MARKETS.keys()),
+            format_func=_market_label,
+            key="market",
+            help="Luxembourg is the fully-supported profile. Belgium is an early beta.",
+        )
+        if MARKETS[market].get("beta"):
+            st.caption(f"{market} is a beta market profile - regulators are real, trend data is still placeholder.")
         submitted = st.form_submit_button("Research client", type="primary", use_container_width=True)
 
     if submitted:
@@ -36,7 +57,7 @@ def render():
             st.error("Client name is required.")
             return
 
-        with st.spinner(f"Researching {client_name} in the Luxembourg market..."):
+        with st.spinner(f"Researching {client_name} in the {market} market..."):
             try:
                 result = research_company(api_key=api_key, client_name=client_name, industry=industry)
                 st.session_state["last_company_result"] = result
@@ -49,8 +70,8 @@ def render():
                 )
                 st.session_state["researched_company_name"] = profile.get("name", client_name)
                 st.session_state["_sync_role_company_size"] = True
-            except Exception as e:
-                st.error(f"Research failed: {e}")
+            except ClaudeClientError as e:
+                st.error(_ERROR_MESSAGES.get(e.kind, _ERROR_MESSAGES["api"]))
                 return
 
     r = st.session_state.get("last_company_result")

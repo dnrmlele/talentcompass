@@ -3,4 +3,5 @@ anthropic>=0.40.0
 plotly>=5.22.0
 pandas>=2.2.0
 fpdf2>=2.8.0
+pydantic>=2
 

@@ -29,6 +29,21 @@ body {
         "Helvetica Neue", Arial, sans-serif !important;
 }
 
+/* Restore the Material Symbols font on icon elements. The broad [data-baseweb] *
+   rule above otherwise overrides the icon font, making icons (expander chevron,
+   selectbox arrow, alert icons) render as their ligature TEXT, e.g.
+   "keyboard_arrow_down". Must come after that rule to win. */
+[data-testid="stIconMaterial"],
+span.material-icons,
+span.material-icons-outlined,
+span.material-symbols-rounded,
+span.material-symbols-outlined,
+[data-baseweb] [class*="material-symbols"],
+[data-baseweb] [class*="material-icons"] {
+    font-family: "Material Symbols Rounded", "Material Symbols Outlined",
+        "Material Icons", "Material Icons Outlined" !important;
+}
+
 [data-testid="stMain"] .stMarkdown,
 [data-testid="stMain"] .stMarkdown *,
 [data-testid="stMain"] h1,

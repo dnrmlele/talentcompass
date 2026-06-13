@@ -140,3 +140,34 @@ def research_company(api_key, client_name, industry="") -> dict:
     return _validate(
         _call(api_key, COMPANY_SYSTEM, prompt, max_tokens=3500), CompanyResearch
     )
+
+
+def disambiguate_company(api_key, name, market="", use_registry=True) -> dict:
+    """List candidate real-world entities for an ambiguous company name.
+
+    Returns {"candidates": [...]}. Used before research to avoid profiling the
+    wrong entity (e.g. a retailer vs a financial firm sharing a name).
+
+    Sourcing: an authoritative registry (GLEIF LEI) is tried first; if it yields
+    candidates they are used as-is (source="registry"). On no match, registry
+    disabled, or any error, falls back to a cheap LLM listing (source="llm").
+    Market resolves via prompts._resolve_market (session/Luxembourg).
+    """
+    if use_registry:
+        try:
+            from services.registry import registry_candidates
+
+            grounded = registry_candidates(name, market)
+        except Exception:
+            grounded = []
+        if grounded:
+            return _validate({"candidates": grounded}, CompanyCandidates)
+
+    prompt = disambiguation_prompt(name, market)
+    result = _validate(
+        _call(api_key, DISAMBIG_SYSTEM, prompt, max_tokens=1200), CompanyCandidates
+    )
+    for c in result.get("candidates", []):
+        if not c.get("source"):
+            c["source"] = "llm"
+    return result

@@ -17,7 +17,10 @@ Graph basis: `graphify-out/graph.json` (87 nodes, 161 edges, 10 communities).
 | WO-07 | Gate module-reload dev hack | 4 | DONE | WO-06 | app.py, README.md |
 | WO-08 | Market parametrization | 4 | DONE | WO-02 | services/prompts.py, pages/client_research.py |
 | WO-09 | Agent template library (slice 1) | 5 | DONE | WO-02, WO-06 | services/agent_library.py (new), pages/role_analysis.py, services/session_io.py, app.py, tests/test_agent_library.py (new) |
-| WO-10 | Company entity disambiguation | 5 | SPEC | WO-02, WO-08 | services/claude_client.py, services/prompts.py, pages/client_research.py |
+| WO-10 | Company entity disambiguation | 5 | DONE | WO-02, WO-08 | services/claude_client.py, services/prompts.py, services/schemas.py, pages/client_research.py, tests/test_disambiguation.py (new) |
+| WO-10b | Registry-grounded candidates (GLEIF) | 6 | DONE | WO-10 | services/registry.py (new), services/claude_client.py, services/schemas.py, pages/client_research.py, tests/test_registry.py (new) |
+| WO-11 | Agent Library page | 6 | DONE | WO-09 | pages/agent_library_page.py (new), app.py |
+| WO-12 | Pluggable template persistence | 6 | DONE | WO-09 | services/template_store.py (new), services/agent_library.py, tests/test_template_store.py (new) |
 
 Status values: READY / IN PROGRESS / REVIEW / DONE / BLOCKED.
 Rule: two work orders that touch the same file never run in parallel. Waves encode this.
@@ -271,6 +274,29 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 
 **Open question for user:** authoritative source. Pure-LLM candidates are still guesses (better-anchored, but unverified). If you want real disambiguation, candidates should come from a registry (e.g. Luxembourg RCS / LBR, or GLEIF LEI data) — that's a WO-10b with an external data source. Recommend shipping the LLM-assisted version first, then grounding it if the accuracy matters for client work.
 
+**DELIVERED (LLM-assisted, user chose this option 2026-06-13):**
+- `services/schemas.py`: `CompanyCandidate` + `CompanyCandidates` (no required field — empty list valid → UI falls back to direct research).
+- `services/prompts.py`: `DISAMBIG_SYSTEM` + `disambiguation_prompt(name, market)` — market-aware via existing MARKETS/_resolve_market.
+- `services/claude_client.py`: `disambiguate_company(api_key, name, market="")` → `_call` (max_tokens=1200, cheap) + `_validate(CompanyCandidates)`.
+- `pages/client_research.py`: removed st.form (multi-step needs free reruns); two buttons — "Find entity" (lists candidates as a radio with sector + hint) and "Research client" (direct path, unchanged). Selecting a candidate routes its legal_name → client_name and sector → industry into the SHARED `_run_research` helper, killing the guess. Single-candidate or skip → today's behaviour. Candidate state cleared after a successful run.
+- `tests/test_disambiguation.py` (5 tests).
+- **Verification:** 36/36 pytest; WO-08 Luxembourg byte-identity RE-CONFIRMED (no regression from the prompts.py additions); disambiguate_company validated-candidates path proven via mock (Cactus → retail vs financial). Server restarted to load it.
+- **Caveat carried:** candidates are LLM-generated — framed in UI as "pick the right one", not ground truth. Registry grounding (RCS/LBR/GLEIF) remains the open WO-10b if client-grade accuracy is needed.
+
+## WO-10b / WO-11 / WO-12 (Fable session, 2026-06-13) — DONE
+
+**WO-12 — Pluggable template persistence (DB-ready seam):** `services/template_store.py` defines `TemplateStore` interface + `SessionStore` (default, today's behaviour) + `FileStore` (JSON on disk, survives restarts). `get_store(state)` picks the backend from env `TC_TEMPLATE_STORE` (session|file) + `TC_TEMPLATE_PATH`. `agent_library` now delegates `get_templates/save_template/list_custom_templates/delete_template` through the store and mirrors into `state[CUSTOM_KEY]` so session export/import + sidebar still see customs in either mode. `CUSTOM_KEY` moved to template_store, re-exported from agent_library (session_io import unchanged). No DB server (app has no backend); a future `DBStore(project_id)` slots into the same interface. 7 new tests.
+
+**WO-11 — Agent Library page:** `pages/agent_library_page.py` — browse built-ins (read-only), create/edit/delete custom templates (CRUD via the store), persistence-mode caption. Nav entry "AGENT LIBRARY" + routing added to app.py (reloads template_store/agent_library/page when TC_DEV). UI page (no unit tests; syntax-verified).
+
+**WO-10b — Registry-grounded candidates:** `services/registry.py` queries the free GLEIF LEI API (stdlib urllib, no new dep) for authoritative legal entities. `disambiguate_company(..., use_registry=True)` tries the registry first → real candidates tagged `source="registry"`; on no-match / disabled (`TC_USE_REGISTRY=0`) / any network error → fails safe to the LLM listing tagged `source="llm"`. `CompanyCandidate.source` added to schema. client_research shows "✓ Authoritative — GLEIF registry" vs "AI-listed — verify before use" on the chosen candidate. 6 new tests (parser, disabled, network-error-safe, registry-preferred-no-LLM-call, LLM fallback).
+
+**Verification:** 49/49 pytest (was 36 → +5 disambig already counted; net +13 across these three: 7 store + 6 registry). black clean across all touched files. Server restarted to load (TC_DEV reload off by default).
+
+**Bug caught + fixed mid-build:** LLM-fallback `source` tagging used `setdefault`, but `model_dump()` already emits `source=None` (schema default) so the key existed → tag never applied. Switched to `if not c.get("source")`. Test `test_disambiguate_falls_back_to_llm` caught it.
+
+**Honesty note (WO-10b):** the live GLEIF call could not be exercised in this sandbox (no network). The PARSER and the registry→LLM fallback control flow are unit-tested with mocked HTTP; the live request path is fail-safe (any exception → LLM fallback). First real-network run should be smoke-tested by the user. GLEIF `category` is coarse (GENERAL/FUND/BRANCH), so registry candidates disambiguate by distinct legal_name + LEI rather than rich sector — the LLM path still gives richer sector when the registry is thin.
+
 ## Coordinator log
 
 - 2026-06-12: Plan created. Wave 1 (WO-01, WO-04) released.
@@ -290,3 +316,5 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 - 2026-06-12: Post-MVP. Added .gitignore + untracked __pycache__ from index (user-approved). Added .streamlit/config.toml pinning light theme + Deloitte palette (fixed dark-mode contrast clash). Fixed Material-icons-as-text bug in styles/main.css ([data-baseweb] * font override was clobbering the icon font → ligature text like "keyboard_arrow_down"; added a restore rule).
 - 2026-06-12: WO-09 DONE (new Wave 5). Agent template library slice 1 — apply/save curated agents, session persistence with DB-ready accessor seam, export/import carries custom templates. 31/31 pytest. Server restarted to load it (TC_DEV reload is off by default, so Python changes need a restart).
 - 2026-06-12: WO-10 SPEC'd (company entity disambiguation, e.g. "Cactus" supermarket vs financial entity). Two-step LLM candidate-selection design; open question logged on whether to ground candidates in a real registry (RCS/LBR/GLEIF) vs LLM-only. Awaiting user go-ahead to build.
+- 2026-06-13: WO-10 DONE (user chose LLM-assisted). "Find entity" step lists candidates → consultant picks → chosen legal_name+sector feed research, removing the guess. 36/36 pytest; WO-08 byte-identity re-confirmed (no regression). Server restarted. WO-10b (registry-grounded candidates) left as the open follow-up for client-grade accuracy. 10 work orders DONE total (WO-01..10); WO-11 (Agent Library page) + WO-12 (DB persistence) + WO-10b (registry) remain as future candidates.
+- 2026-06-13: WO-12 + WO-11 + WO-10b DONE in one session. Pluggable persistence (session/file store, DB-ready), Agent Library CRUD page + nav, GLEIF registry-grounded disambiguation with fail-safe LLM fallback. 49/49 pytest; black clean; server restarted. 13 work orders DONE total. Open: WO-12b (real DBStore behind the store interface, needs identity/infra), live GLEIF smoke test (sandbox had no network). Working tree still uncommitted — user's commit/PR call.

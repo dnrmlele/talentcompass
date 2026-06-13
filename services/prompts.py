@@ -1,9 +1,11 @@
-
 ROLE_SYSTEM = """You are an expert AI transformation consultant specializing in workforce automation.
 You always respond with valid, parseable JSON only - no markdown, no prose, no explanation. Raw JSON only."""
 
+
 def role_prompt(job_title, department, company_size, job_description, client_name=""):
-    client_ctx = f"The client is {client_name} (Luxembourg market)." if client_name else ""
+    client_ctx = (
+        f"The client is {client_name} (Luxembourg market)." if client_name else ""
+    )
     return f"""Analyze this role for AI automation potential. {client_ctx}
 
 Job Title: {job_title}

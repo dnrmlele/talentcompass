@@ -56,6 +56,7 @@ import pages.client_research as client_research
 import pages.org_overview as org_overview
 import pages.reports_export as reports_export
 import pages.role_analysis as role_analysis
+import pages.agent_library_page as agent_library_page
 from services import session_io
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ with st.sidebar:
             "ROLE ANALYSIS",
             "CLIENT RESEARCH",
             "ORGANIZATION VIEW",
+            "AGENT LIBRARY",
             "REPORTS & EXPORT",
         ],
         label_visibility="collapsed",
@@ -206,6 +208,13 @@ elif page == "CLIENT RESEARCH":
 elif page == "ORGANIZATION VIEW":
     _reload_modules("pages.org_overview")
     org_overview.render()
+elif page == "AGENT LIBRARY":
+    _reload_modules(
+        "services.template_store",
+        "services.agent_library",
+        "pages.agent_library_page",
+    )
+    agent_library_page.render()
 elif page == "REPORTS & EXPORT":
     _reload_modules("services.pdf_export", "pages.reports_export")
     reports_export.render()

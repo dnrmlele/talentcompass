@@ -140,6 +140,7 @@ class CompanyCandidate(_Base):
     sector: Optional[str] = None
     description: Optional[str] = None
     hint: Optional[str] = None
+    source: Optional[str] = None  # "registry" (GLEIF) or "llm"
 
 
 class CompanyCandidates(_Base):

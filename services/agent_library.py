@@ -15,6 +15,10 @@ from __future__ import annotations
 
 from typing import Any
 
+# CUSTOM_KEY is owned by template_store now; re-exported here so existing imports
+# (services.session_io) keep working. get_store resolves the persistence backend.
+from services.template_store import CUSTOM_KEY, get_store
+
 # Fields that make up an AI agent (must match what Claude returns / the PDF reads).
 AGENT_FIELDS = (
     "name",
@@ -26,9 +30,6 @@ AGENT_FIELDS = (
 )
 # A template is an agent plus a category label for browsing.
 _TEMPLATE_EXTRA = ("category",)
-
-# Session-state key holding consultant-saved custom templates.
-CUSTOM_KEY = "custom_agent_templates"
 
 
 # Built-in library — seeded for the Luxembourg fund-admin / finance market.
@@ -101,16 +102,29 @@ def _clean(d: dict[str, Any], keep_category: bool) -> dict[str, Any]:
     return out
 
 
+def _mirror(state: Any, customs: list[dict[str, Any]]) -> None:
+    """Keep state[CUSTOM_KEY] in sync with the store so session export/import and
+    the sidebar see custom templates regardless of which backend persists them."""
+    try:
+        state[CUSTOM_KEY] = list(customs)
+    except Exception:
+        pass
+
+
+def list_custom_templates(state: Any) -> list[dict[str, Any]]:
+    """Custom templates from the configured store (built-ins excluded)."""
+    customs = [_clean(t, keep_category=True) for t in get_store(state).load()]
+    _mirror(state, customs)
+    return customs
+
+
 def get_templates(state: Any) -> list[dict[str, Any]]:
-    """Built-in templates plus this session's custom ones (built-ins first)."""
-    custom = list(state.get(CUSTOM_KEY) or [])
-    return [dict(t) for t in BUILTIN_AGENT_TEMPLATES] + [
-        _clean(t, keep_category=True) for t in custom
-    ]
+    """Built-in templates plus the configured store's custom ones (built-ins first)."""
+    return [dict(t) for t in BUILTIN_AGENT_TEMPLATES] + list_custom_templates(state)
 
 
 def save_template(state: Any, template: dict[str, Any]) -> dict[str, Any]:
-    """Save (or replace by name) a custom template into session state.
+    """Save (or replace by name) a custom template via the configured store.
 
     Returns the cleaned template. Raises ValueError if it has no name.
     """
@@ -119,13 +133,27 @@ def save_template(state: Any, template: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("A template needs a name.")
     cleaned = _clean(template, keep_category=True)
     cleaned["name"] = name
-    custom = list(state.get(CUSTOM_KEY) or [])
+    store = get_store(state)
     custom = [
-        c for c in custom if (c.get("name") or "").strip().lower() != name.lower()
+        c for c in store.load() if (c.get("name") or "").strip().lower() != name.lower()
     ]
     custom.append(cleaned)
-    state[CUSTOM_KEY] = custom
+    store.save(custom)
+    _mirror(state, custom)
     return cleaned
+
+
+def delete_template(state: Any, name: str) -> bool:
+    """Delete a custom template by name. Returns True if one was removed."""
+    target = (name or "").strip().lower()
+    store = get_store(state)
+    before = store.load()
+    after = [c for c in before if (c.get("name") or "").strip().lower() != target]
+    if len(after) == len(before):
+        return False
+    store.save(after)
+    _mirror(state, after)
+    return True
 
 
 def apply_to_role(role: dict[str, Any], template: dict[str, Any]) -> dict[str, Any]:

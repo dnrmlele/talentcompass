@@ -4,24 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-**TalentCompass** is a Python-based web application for AI workforce intelligence analysis, built with:
+**TalentCompass** is a Python web app for AI workforce intelligence and HR advisory, built with:
 
-- **Framework**: Streamlit (v1.35+) — interactive single-page UI with sidebar navigation
-- **LLM Integration**: Anthropic Claude API (currently claude-haiku-4-5 for role analysis, claude-opus-4-5 referenced in README for future upgrades)
-- **Data & Visualization**: Plotly (v5.22+), Pandas (v2.2+) for charts and tables
+- **Framework**: Streamlit (v1.35+) — single-page UI with sidebar navigation
+- **LLM Integration**: Anthropic Claude API. Model is selectable at runtime (sidebar): `claude-haiku-4-5` (default, fast) or `claude-opus-4-5` (quality).
+- **Validation**: pydantic v2 — every Claude JSON response is validated against a schema (`services/schemas.py`) at the API boundary.
+- **Data & Visualization**: Plotly (v5.22+), Pandas (v2.2+)
 - **PDF Export**: fpdf2 (v2.8+) with custom Deloitte-branded templates
-- **Styling**: Custom CSS with Deloitte brand colors; Cabinet Grotesk font via Fontshare
-- **Dev Container**: Python 3.11 (Debian bookworm) for consistent development
+- **Styling**: Custom CSS (Deloitte brand); Cabinet Grotesk via Fontshare. Light theme pinned in `.streamlit/config.toml`.
+- **Tests**: pytest (`requirements-dev.txt`); includes byte-deterministic golden-file PDF tests.
 
 ## Project Purpose
 
-TalentCompass generates dynamic, AI-driven assessments for:
-1. **Role Analysis**: Automation potential, task breakdown, AI agent recommendations, reskilling roadmap, and risk analysis — all generated live from job descriptions
-2. **Client Research**: Luxembourg market intelligence including AI potential scoring, industry trends, competitor moves, and Deloitte engagement angles
-3. **Organization Overview**: Comparative charts across multiple role analyses
-4. **Reports & Export**: Deloitte-branded PDFs for individual analyses or combined session reports
+TalentCompass generates AI-driven workforce assessments and HR advisory:
+1. **Role Analysis**: automation potential, task breakdown, AI agent recommendations, reskilling, roadmap, risks — plus **deterministic workforce impact** (FTE freed, payroll savings, severance exposure) and an opt-in **HR management & advisory** layer.
+2. **Client Research**: market intelligence (AI potential, trends, competitor moves, Deloitte angle) with **entity disambiguation** to resolve ambiguous company names before research.
+3. **Organization Overview**: comparative charts plus an org-wide workforce/financial rollup.
+4. **Agent Library**: curated AI-agent templates (built-in + custom) appliable to roles.
+5. **Reports & Export**: Deloitte-branded PDFs; JSON session export/import.
 
-All assessments are dynamically generated via Claude API; no hardcoded scores or presets.
+LLM outputs are dynamic (no hardcoded scores). Financial figures are computed arithmetic, not LLM estimates.
 
 ## Architecture
 
@@ -29,99 +31,100 @@ All assessments are dynamically generated via Claude API; no hardcoded scores or
 
 ```
 talentcompass/
-├── app.py                     # Streamlit entry point, sidebar, page routing
+├── app.py                      # Entry point, sidebar (key, model, session I/O), routing
+├── .streamlit/config.toml      # Pinned light theme + Deloitte palette
 ├── services/
-│   ├── claude_client.py       # Anthropic API wrapper; analyze_role() & research_company()
-│   ├── prompts.py             # System prompts (ROLE_SYSTEM, COMPANY_SYSTEM) and prompt builders
-│   ├── company_context.py     # Company size inference (inferred_size_to_company_size)
-│   └── pdf_export.py          # PDF builders with Deloitte branding
+│   ├── claude_client.py        # API wrapper: analyze_role, research_company,
+│   │                           #   disambiguate_company, analyze_hr_advisory;
+│   │                           #   ClaudeClientError, _call/_send/_parse, _validate, model config
+│   ├── prompts.py              # System prompts + builders; MARKETS dict (Luxembourg/Belgium)
+│   ├── schemas.py              # pydantic v2 models for every Claude response
+│   ├── company_context.py      # Company-size bucket inference
+│   ├── session_io.py           # Export/import session as JSON (strips api_key)
+│   ├── agent_library.py        # AI-agent template library (builtin + custom)
+│   ├── template_store.py       # Pluggable persistence: SessionStore | FileStore (DB-ready seam)
+│   ├── registry.py             # GLEIF LEI registry lookup for entity disambiguation
+│   ├── workforce.py            # Deterministic FTE / payroll / severance maths + rollup
+│   └── pdf/                     # PDF package (split from the old pdf_export.py monolith)
+│       ├── base.py             #   _DeloittePDF, colours, _safe, _ts, render helpers
+│       ├── sections.py         #   _write_role_section, _write_company_section
+│       └── builders.py         #   the 5 build_* functions
+│   └── pdf_export.py           # Thin re-export shim (back-compat for existing imports)
 ├── pages/
-│   ├── role_analysis.py       # Role Analysis UI & presets
-│   ├── client_research.py     # Client Research form & results
-│   ├── org_overview.py        # Comparative charts (automation, hours saved, task distribution)
-│   └── reports_export.py      # Session history, tabbed review, PDF downloads
-├── styles/main.css            # Deloitte brand styling (green #86BC25, fonts, components)
-├── assets/fonts/              # DejaVuSans.ttf, DejaVuSans-Bold.ttf for PDF rendering
-└── requirements.txt
+│   ├── role_analysis.py        # Role Analysis: presets, workforce inputs, agent library, HR advisory
+│   ├── client_research.py      # Client Research: market select, Find entity / Research
+│   ├── org_overview.py         # Comparative charts + workforce rollup
+│   ├── agent_library_page.py   # Browse/create/edit/delete agent templates
+│   └── reports_export.py       # Session history, tabbed review, PDF downloads
+├── styles/main.css             # Deloitte brand styling
+├── assets/fonts/               # DejaVuSans.ttf, DejaVuSans-Bold.ttf for PDF
+├── tests/                      # pytest suite + golden PDF checksums
+├── requirements.txt
+└── requirements-dev.txt        # pytest
 ```
 
 ### Key Design Patterns
 
-**Session State Management**: Streamlit's `st.session_state` is the single source of truth for:
-- `api_key`: User's Claude API key (never persisted, browser session only)
-- `org_roles`: List of analyzed roles (each entry tagged with `_title`, `_client`, `_dept`)
-- `org_companies`: List of researched companies
-- `last_company_result`: Last company research result (enables client→role sync)
+**Session State**: `st.session_state` is the single source of truth: `api_key` (never persisted), `model`, `market`, `org_roles` (each tagged `_title`/`_client`/`_dept`, may carry `workforce` + `hr_advisory`), `org_companies`, `last_company_result`, `custom_agent_templates`.
 
-**Module Reloading**: `app.py` calls `importlib.reload()` on service modules before each page render to apply live code edits without restarting Streamlit.
+**API Abstraction & Hardening** (`services/claude_client.py`): all calls go through `_call()` → `_send()` (API) + `_parse()` (strip fences + json.loads). On `JSONDecodeError` it retries once; failures raise `ClaudeClientError(message, kind)` with `kind` ∈ `auth|rate_limit|bad_json|api`. Pages catch it and show a friendly `st.error` (no tracebacks). The model is resolved per call via `_resolve_model()` (reads `session_state['model']`, falls back to haiku).
 
-**API Abstraction**: `services/claude_client.py` centralizes all Claude API calls with two main functions:
-- `analyze_role(api_key, job_title, department, company_size, job_description, client_name)` → JSON with automation_score, tasks[], ai_agents[], roadmap[], risks[], stats
-- `research_company(api_key, client_name, industry)` → JSON with company_profile, ai_potential_score, industry_ai_trends[], competitor_moves[], key_ai_opportunities[], risks_and_barriers[]
+**Schema Validation** (`services/schemas.py`): `_validate(data, Model)` runs `Model.model_validate(...).model_dump()` after parsing; a `ValidationError` raises `ClaudeClientError(kind="bad_json")` directly (NOT routed through the JSON retry — it is valid JSON of the wrong shape). All models use `extra="allow"` so unknown keys survive and `_title`/`_dept`/`_client` tags round-trip.
 
-Both call `_call()` which strips markdown fencing from Claude's response and parses raw JSON.
+**Deterministic vs LLM split**: `services/workforce.py` computes FTE/payroll/severance with plain arithmetic on consultant inputs — defensible and reproducible. The LLM only supplies qualitative content (automation_score, advisory). Keep this separation: never present a computed figure as an LLM guess or vice versa.
 
-**Prompt Engineering**: System prompts instruct Claude to output only valid JSON without markdown. User prompts are dynamically built with actual job descriptions or company names; no generic templates. Role analysis prompt explicitly instructs Claude to base all analysis on actual job description text.
+**Pluggable persistence** (`services/template_store.py`): `get_store(state)` returns `SessionStore` (default) or `FileStore` (env `TC_TEMPLATE_STORE=file`). `agent_library` reads/writes only through this interface — a future `DBStore` slots in without UI changes.
 
-**Presets System**: `role_analysis.py` includes PRESETS dict (Financial Analyst, Compliance Officer, HR Manager, Data Analyst, Fund Accountant) for quick form population during development/demo, but actual analysis is always live.
+**Entity disambiguation** (`disambiguate_company`): tries the GLEIF registry (`services/registry.py`) first (authoritative, `source="registry"`); on miss/offline/disabled falls back to an LLM candidate listing (`source="llm"`). Fail-safe — any registry error returns to the LLM path.
+
+**Module Reloading** (`app.py::_reload_modules`): reloads submodules each rerun so code edits apply without a restart. **Gated behind `TC_DEV=1`** — a no-op in normal runs. Set `TC_DEV=1` while iterating locally; Python changes otherwise need a server restart.
+
+**Presets**: `role_analysis.py` PRESETS dict for quick form fill; analysis is always live.
 
 ## Commands
 
-### Install & Run
-
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the development server
-streamlit run app.py
-
-# Access at http://localhost:8501 in your browser
+pip install -r requirements.txt           # runtime deps
+pip install -r requirements-dev.txt       # pytest
+streamlit run app.py                       # http://localhost:8501
+pytest -q                                  # run the test suite
 ```
 
-### Dev Container (VS Code)
+### Environment flags
 
-If using `.devcontainer/devcontainer.json`:
-- Open in Dev Container → automatically installs dependencies and launches Streamlit on port 8501
-- Streamlit runs with `--server.enableCORS false --server.enableXsrfProtection false`
+- `TC_DEV=1` — enable hot module reload (dev only).
+- `TC_TEMPLATE_STORE=file` (+ optional `TC_TEMPLATE_PATH`) — persist custom agent templates to disk instead of session.
+- `TC_USE_REGISTRY=0` — disable GLEIF registry lookup (LLM-only disambiguation).
+- `GEMINI_API_KEY`/`GOOGLE_API_KEY` — only used by the graphify tooling, not the app.
 
 ### Workflow Notes
 
-- **No build or test command**: This is a runtime-only app; there are no tests or build steps.
-- **Hot reload**: Streamlit reruns `app.py` on file save. Service modules are explicitly reloaded to pick up edits.
-- **API key requirement**: All Claude calls require a valid `sk-ant-...` API key pasted in the sidebar at runtime.
+- **Tests exist now**: `pytest` must stay green. PDF golden tests assert byte-identical output — they freeze `_ts` and the fpdf creation date in `tests/conftest.py`. New PDF sections must be guarded by their data key (e.g. `if r.get("workforce")`) so fixtures without that key stay byte-identical.
+- **API key**: all Claude calls need a valid `sk-ant-...` key pasted in the sidebar at runtime.
 
 ## Important Architectural Constraints
 
-1. **JSON-only responses**: Claude must return valid JSON. Both `_call()` in `claude_client.py` and system prompts enforce this strictly. If Claude returns markdown, JSON parsing fails.
-
-2. **Exact JSON structure**: Role analysis and company research prompts specify exact JSON schemas with fixed keys. Claude must respect these structures or the UI will fail to render results.
-
-3. **Luxembourg market focus**: Company research is heavily weighted toward Luxembourg market context (fund admin, banking, CSSF/CNPD compliance, etc.). Competitor names, regulatory frameworks, and industry trends are hardcoded in the system prompt.
-
-4. **Session-only persistence**: API keys and all analysis results live only in the browser session. There is no backend database or file persistence (except PDF downloads). Refreshing the page clears all data.
-
-5. **No API key storage**: Keys are never written to disk, environment variables, or server-side storage. They are validated at runtime only.
+1. **JSON-only + schema-validated**: prompts demand raw JSON; `_call()` parses it and `_validate()` checks it against a pydantic model. Missing required fields (e.g. `automation_score`) surface a friendly error.
+2. **Market profiles**: `prompts.py::MARKETS` parametrizes market context. Luxembourg is the complete, default profile and its prompt output is kept **byte-identical** to the original `COMPANY_SYSTEM` (a test asserts this — do not regress it). Belgium is a beta skeleton.
+3. **Session persistence**: results live in the browser session; `services/session_io.py` exports/imports them as JSON (never including the api_key). Custom agent templates can additionally persist to disk via `FileStore`.
+4. **No API key storage**: keys are never written to disk, env, or server. Session export strips them by allow-list (only `org_roles`/`org_companies`/`custom_agent_templates` are serialised).
+5. **Computed figures are not LLM output**: workforce/financial numbers come from `services/workforce.py` arithmetic.
 
 ## CSS & Branding
 
-- **Color scheme**: Deloitte green (#86BC25), black (#1A1A1A), greys for borders/backgrounds
-- **Typography**: Cabinet Grotesk (imported from Fontshare) for headings; system fonts for body
-- **Custom Streamlit overrides**: `main.css` hides default header, customizes buttons, inputs, alerts, metric cards, radio buttons, and tabs
-- **Deloitte logo**: Embedded as base64 data URI in sidebar; also used in PDF headers
+- Colors: Deloitte green `#86BC25`, black `#1A1A1A`, greys. Light theme pinned in `.streamlit/config.toml`.
+- Typography: Cabinet Grotesk (Fontshare) for headings. Note `main.css` restores the Material Symbols icon font on icon elements so the `[data-baseweb] *` font override doesn't render icons as ligature text.
+- Deloitte logo: base64 data URI in sidebar; also in PDF headers.
 
 ## PDF Export Details
 
-- **Library**: fpdf2 with custom `_DeloittePDF` base class in `pdf_export.py`
-- **Fonts**: DejaVu fonts (UTF-8 support); characters outside BMP are dropped or replaced
-- **Safe text rendering**: `_safe()` function normalizes Unicode (em dashes, quotes, ellipses) for PDF compatibility
-- **Multiple export modes**: Single role, all roles, single company, all companies, or combined session report
-- **PDF builders**: `build_single_role_pdf()`, `build_roles_pdf()`, `build_single_company_pdf()`, `build_companies_pdf()`, `build_combined_pdf()`
+- Package `services/pdf/` (`base.py`, `sections.py`, `builders.py`); `services/pdf_export.py` is a re-export shim.
+- `_safe()` normalizes Unicode for DejaVu; characters that fail UTF-8 round-trip are dropped.
+- Builders: `build_single_role_pdf`, `build_roles_pdf`, `build_single_company_pdf`, `build_companies_pdf`, `build_combined_pdf`. Role PDFs include guarded workforce + HR-advisory blocks.
 
 ## Known Gaps & Future Improvements
 
-- Model is currently `claude-haiku-4-5` for cost/speed, but README mentions potential upgrade to `claude-opus-4-5` for higher quality
-- Company research is hardcoded for Luxembourg; scaling to other markets would require system prompt rework
-- No version pinning beyond minimum versions in `requirements.txt`
-- No input validation beyond empty checks; malformed job descriptions or company names are passed directly to Claude
-
+- `template_store.py` has the seam for a real per-user/project DB (`DBStore`), not yet implemented (needs identity/infra).
+- GLEIF disambiguation live call should be smoke-tested with network access; its candidates are authoritative but `category` is coarse.
+- Belgium market profile is beta (real regulators/players, placeholder trends).
+- Project orchestration / work-order history lives in `ORCHESTRATION.md`.

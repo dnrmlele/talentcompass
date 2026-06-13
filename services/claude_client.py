@@ -9,8 +9,15 @@ from services.prompts import (
     company_prompt,
     DISAMBIG_SYSTEM,
     disambiguation_prompt,
+    HR_ADVISORY_SYSTEM,
+    hr_advisory_prompt,
 )
-from services.schemas import RoleAnalysis, CompanyResearch, CompanyCandidates
+from services.schemas import (
+    RoleAnalysis,
+    CompanyResearch,
+    CompanyCandidates,
+    HRAdvisory,
+)
 
 _RETRY_INSTRUCTION = (
     "Your previous reply was not valid JSON. Return ONLY the JSON object, "
@@ -171,3 +178,16 @@ def disambiguate_company(api_key, name, market="", use_registry=True) -> dict:
         if not c.get("source"):
             c["source"] = "llm"
     return result
+
+
+def analyze_hr_advisory(api_key, role, workforce=None) -> dict:
+    """Generate HR management & advisory guidance for a completed role analysis.
+
+    Qualitative layer (redeployment, reskilling, change management, retention,
+    workforce planning) — complements the deterministic workforce maths. Optional
+    `workforce` dict feeds computed FTE/payroll figures into the prompt.
+    """
+    prompt = hr_advisory_prompt(role, workforce)
+    return _validate(
+        _call(api_key, HR_ADVISORY_SYSTEM, prompt, max_tokens=2500), HRAdvisory
+    )

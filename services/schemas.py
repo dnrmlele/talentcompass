@@ -147,3 +147,37 @@ class CompanyCandidates(_Base):
     # No required field: an empty list is valid (name was unambiguous / no match),
     # and the UI falls back to direct research in that case.
     candidates: list[CompanyCandidate] = Field(default_factory=list)
+
+
+# ── HR management & advisory (WO-14) ─────────────────────────────────────────────
+class RedeploymentOption(_Base):
+    option: Optional[str] = None
+    description: Optional[str] = None
+    effort: Optional[str] = None  # Low | Medium | High
+
+
+class RetentionPriority(_Base):
+    group: Optional[str] = None
+    reason: Optional[str] = None
+    action: Optional[str] = None
+
+
+class ChangeStep(_Base):
+    phase: Optional[str] = None
+    actions: list[str] = Field(default_factory=list)
+
+
+class HRRisk(_Base):
+    risk: Optional[str] = None
+    mitigation: Optional[str] = None
+
+
+class HRAdvisory(_Base):
+    # All-optional: advisory is best-effort qualitative guidance, not a hard schema.
+    summary: Optional[str] = None
+    redeployment_options: list[RedeploymentOption] = Field(default_factory=list)
+    reskilling_focus: list[str] = Field(default_factory=list)
+    change_management: list[ChangeStep] = Field(default_factory=list)
+    retention_priorities: list[RetentionPriority] = Field(default_factory=list)
+    workforce_planning: list[str] = Field(default_factory=list)
+    hr_risks: list[HRRisk] = Field(default_factory=list)

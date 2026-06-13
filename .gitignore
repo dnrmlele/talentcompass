@@ -22,6 +22,18 @@ htmlcov/
 # Graphify generated output
 graphify-out/
 
+# Generated / exported artifacts (not source)
+*.pptx
+TalentCompass_*.pdf
+talentcompass_session.json
+
+# Local template file-store (WO-12 FileStore default + local overrides)
+.talentcompass/
+agent_templates.json
+
+# Local machine settings (permissions, etc.)
+.claude/settings.local.json
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -21,6 +21,8 @@ Graph basis: `graphify-out/graph.json` (87 nodes, 161 edges, 10 communities).
 | WO-10b | Registry-grounded candidates (GLEIF) | 6 | DONE | WO-10 | services/registry.py (new), services/claude_client.py, services/schemas.py, pages/client_research.py, tests/test_registry.py (new) |
 | WO-11 | Agent Library page | 6 | DONE | WO-09 | pages/agent_library_page.py (new), app.py |
 | WO-12 | Pluggable template persistence | 6 | DONE | WO-09 | services/template_store.py (new), services/agent_library.py, tests/test_template_store.py (new) |
+| WO-13 | Workforce impact (FTE/payroll/severance) | 7 | DONE | WO-02 | services/workforce.py (new), pages/role_analysis.py, pages/org_overview.py, services/pdf/sections.py, tests/test_workforce.py (new) |
+| WO-14 | HR management & advisory (LLM) | 7 | DONE | WO-02, WO-13 | services/schemas.py, services/prompts.py, services/claude_client.py, pages/role_analysis.py, services/pdf/sections.py, tests/test_hr_advisory.py (new) |
 
 Status values: READY / IN PROGRESS / REVIEW / DONE / BLOCKED.
 Rule: two work orders that touch the same file never run in parallel. Waves encode this.
@@ -297,6 +299,18 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 
 **Honesty note (WO-10b):** the live GLEIF call could not be exercised in this sandbox (no network). The PARSER and the registry→LLM fallback control flow are unit-tested with mocked HTTP; the live request path is fail-safe (any exception → LLM fallback). First real-network run should be smoke-tested by the user. GLEIF `category` is coarse (GENERAL/FUND/BRANCH), so registry candidates disambiguate by distinct legal_name + LEI rather than rich sector — the LLM path still gives richer sector when the registry is thin.
 
+## WO-13 / WO-14 (Fable session, 2026-06-13) — DONE
+
+**Context fix:** the user clarified "tuning agents" meant RESEARCH/ANALYSIS modules (FTE, payroll, HR), not the AI-agent recommendation templates (WO-09/11/12). WO-13/14 deliver the workforce/HR analysis layer. This is also the real answer to the earlier "are the figures BS?" concern — FTE/payroll/severance are deterministic arithmetic on consultant inputs, not LLM guesses.
+
+**WO-13 — Workforce & financial impact (deterministic):** `services/workforce.py` — `compute_workforce_impact` (FTE freed = hours_saved×headcount/40 capped at headcount; annual payroll savings; transition cost; net savings; displaced FTE from fully_automatable_pct; severance exposure) + `rollup_workforce`. Per-role inputs (headcount, loaded cost, reskill cost/FTE, severance months) in Role Analysis; live recompute in results without re-calling Claude; org-wide rollup in Organization Overview; guarded workforce block in the role PDF (golden fixtures lack the key → byte-identical, goldens stay green). 6 tests.
+
+**WO-14 — HR management & advisory (LLM):** `HRAdvisory` schema (all-optional: redeployment_options, reskilling_focus, change_management, retention_priorities, workforce_planning, hr_risks) + `hr_advisory_prompt`/`HR_ADVISORY_SYSTEM` (Luxembourg labour-law aware; feeds computed workforce figures when present) + `analyze_hr_advisory(api_key, role, workforce)`. Opt-in "Generate HR advisory" button in Role Analysis (one extra Claude call), two-column render + regenerate; guarded HR block in role PDF. 6 tests.
+
+**Verification:** 61/61 pytest. Goldens green (both new PDF blocks guarded by key presence). WO-08 + role_prompt byte-identity re-confirmed after prompts.py additions. PDF with workforce+advisory renders (133 KB). black clean. Server restarted.
+
+**Split honoured:** financial figures = pure maths (defensible, reproducible); advisory = LLM (qualitative, opt-in). Clean separation so a client deliverable can show the computed numbers with confidence and the advisory as guidance.
+
 ## Coordinator log
 
 - 2026-06-12: Plan created. Wave 1 (WO-01, WO-04) released.
@@ -318,3 +332,6 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 - 2026-06-12: WO-10 SPEC'd (company entity disambiguation, e.g. "Cactus" supermarket vs financial entity). Two-step LLM candidate-selection design; open question logged on whether to ground candidates in a real registry (RCS/LBR/GLEIF) vs LLM-only. Awaiting user go-ahead to build.
 - 2026-06-13: WO-10 DONE (user chose LLM-assisted). "Find entity" step lists candidates → consultant picks → chosen legal_name+sector feed research, removing the guess. 36/36 pytest; WO-08 byte-identity re-confirmed (no regression). Server restarted. WO-10b (registry-grounded candidates) left as the open follow-up for client-grade accuracy. 10 work orders DONE total (WO-01..10); WO-11 (Agent Library page) + WO-12 (DB persistence) + WO-10b (registry) remain as future candidates.
 - 2026-06-13: WO-12 + WO-11 + WO-10b DONE in one session. Pluggable persistence (session/file store, DB-ready), Agent Library CRUD page + nav, GLEIF registry-grounded disambiguation with fail-safe LLM fallback. 49/49 pytest; black clean; server restarted. 13 work orders DONE total. Open: WO-12b (real DBStore behind the store interface, needs identity/infra), live GLEIF smoke test (sandbox had no network). Working tree still uncommitted — user's commit/PR call.
+- 2026-06-13: Committed WO-10/10b/11/12 to branch talentcompass-v2 (commit 42c1c5b; prior 7e9e681 held WO-01..09 + infra). First commit message mangled (PowerShell here-string in Bash tool) → amended clean.
+- 2026-06-13: graphify . --update run after WO-13 role slice — 34 changed files (30 code + 4 docs, 1 semantic subagent). Graph 87→347 nodes, 690 edges, 17 communities. New god nodes surfaced: _Base, get_store, compute_workforce_impact, ClaudeClientError. Outputs (graph.html/json, GRAPH_REPORT.md) refreshed; ~50k tokens incremental.
+- 2026-06-13: WO-13 + WO-14 DONE. Workforce maths (deterministic FTE/payroll/severance + org rollup) and HR advisory (LLM, opt-in). 61/61 pytest; goldens green (guarded PDF blocks); byte-identity preserved. 15 work orders DONE total. Uncommitted since the v2 commit — WO-13/14 + graphify-out refresh not yet committed.

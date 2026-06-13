@@ -89,6 +89,72 @@ def _write_role_section(pdf: FPDF, r: dict[str, Any], index: int | None = None) 
             for it in risk.get("items") or []:
                 _body(pdf, f"    - {it}", 9)
 
+    wf = r.get("workforce")
+    if wf:
+        _subh(pdf, "Workforce & financial impact (computed)")
+        _body(
+            pdf,
+            f"Headcount: {wf.get('headcount', 0)}  |  "
+            f"FTE freed: {wf.get('fte_freed', 0)}  |  "
+            f"Displaced (fully-automatable): {wf.get('displaced_fte', 0)} FTE",
+            9,
+        )
+        _body(
+            pdf,
+            f"Annual payroll savings: EUR {wf.get('annual_payroll_savings', 0):,.0f}  |  "
+            f"Transition cost: EUR {wf.get('transition_cost', 0):,.0f}  |  "
+            f"Net annual savings: EUR {wf.get('net_annual_savings', 0):,.0f}",
+            9,
+        )
+        _body(
+            pdf,
+            f"Severance exposure ({wf.get('severance_months', 0):.0f} months basis): "
+            f"EUR {wf.get('severance_exposure', 0):,.0f}",
+            9,
+        )
+
+    adv = r.get("hr_advisory")
+    if adv:
+        _subh(pdf, "HR management & advisory")
+        if adv.get("summary"):
+            _body(pdf, adv["summary"], 9)
+        if adv.get("redeployment_options"):
+            _body(pdf, "Redeployment options:", 9)
+            for o in adv["redeployment_options"]:
+                _body(
+                    pdf,
+                    f"    - {o.get('option', '')} ({o.get('effort', '')}): {o.get('description', '')}",
+                    9,
+                )
+        if adv.get("reskilling_focus"):
+            _body(pdf, "Reskilling focus:", 9)
+            _bullets(pdf, [str(s) for s in adv["reskilling_focus"]])
+        if adv.get("retention_priorities"):
+            _body(pdf, "Retention priorities:", 9)
+            for p in adv["retention_priorities"]:
+                _body(
+                    pdf,
+                    f"    - {p.get('group', '')}: {p.get('reason', '')} -> {p.get('action', '')}",
+                    9,
+                )
+        if adv.get("change_management"):
+            _body(pdf, "Change management:", 9)
+            for step in adv["change_management"]:
+                _body(pdf, f"    {step.get('phase', '')}", 9)
+                for a in step.get("actions") or []:
+                    _body(pdf, f"        - {a}", 9)
+        if adv.get("workforce_planning"):
+            _body(pdf, "Workforce planning:", 9)
+            _bullets(pdf, [str(s) for s in adv["workforce_planning"]])
+        if adv.get("hr_risks"):
+            _body(pdf, "HR risks:", 9)
+            for hr in adv["hr_risks"]:
+                _body(
+                    pdf,
+                    f"    - {hr.get('risk', '')} -> {hr.get('mitigation', '')}",
+                    9,
+                )
+
     pdf.ln(2)
 
 

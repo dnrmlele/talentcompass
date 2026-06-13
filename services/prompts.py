@@ -130,6 +130,62 @@ You always respond with valid, parseable JSON only - no markdown, no prose, no e
 COMPANY_SYSTEM = company_system("Luxembourg")
 
 
+HR_ADVISORY_SYSTEM = """You are a senior HR transformation and workforce advisory consultant.
+You give practical, humane, realistic HR management guidance for AI-driven role change.
+You always respond with valid, parseable JSON only - no markdown, no prose, no explanation. Raw JSON only."""
+
+
+def hr_advisory_prompt(role, workforce=None):
+    """Build an HR-advisory prompt from a completed role analysis + optional
+    computed workforce impact (headcount, FTE freed, displaced, savings)."""
+    wf = workforce or {}
+    stats = role.get("stats") or {}
+    wf_ctx = ""
+    if wf.get("headcount"):
+        wf_ctx = (
+            f"\nWorkforce figures (computed, treat as given):\n"
+            f"- Headcount: {wf.get('headcount')}\n"
+            f"- FTE freed by automation: {wf.get('fte_freed')}\n"
+            f"- Fully-automatable (displaced) FTE: {wf.get('displaced_fte')}\n"
+            f"- Annual payroll savings: EUR {wf.get('annual_payroll_savings')}\n"
+        )
+    return (
+        f"""Give HR management and advisory guidance for transforming this role with AI.
+Focus on PEOPLE: redeployment, reskilling investment, change management, retention, and
+workforce planning. Be specific to this role and realistic for a Luxembourg employer.
+
+Role: {role.get('_title', '')}
+Department: {role.get('_dept', '')}
+Automation score: {role.get('automation_score', 0)}%
+Task mix: {stats.get('fully_automatable_pct', 0)}% fully automatable, """
+        + f"""{stats.get('ai_augmented_pct', 0)}% AI-augmented, {stats.get('human_only_pct', 0)}% human-only.{wf_ctx}
+
+Return a JSON object with exactly this structure:
+{{
+  "summary": "<3-sentence HR advisory summary specific to this role>",
+  "redeployment_options": [
+    {{"option": "<redeployment destination/role>", "description": "<why it fits, what transfers>", "effort": "<Low|Medium|High>"}}
+  ],
+  "reskilling_focus": ["<concrete skill or programme>", "<...>"],
+  "change_management": [
+    {{"phase": "<phase name>", "actions": ["<action>", "<action>"]}}
+  ],
+  "retention_priorities": [
+    {{"group": "<who to retain>", "reason": "<why critical>", "action": "<retention action>"}}
+  ],
+  "workforce_planning": ["<hiring/redeploy/exit recommendation>", "<...>"],
+  "hr_risks": [
+    {{"risk": "<people/HR risk>", "mitigation": "<mitigation>"}}
+  ]
+}}
+
+Rules:
+- Lead with redeployment and reskilling, not headcount reduction, where credible.
+- Be concrete and actionable; no generic filler.
+- Respect Luxembourg labour-law realities (consultation, notice, social plans) in change_management and hr_risks."""
+    )
+
+
 DISAMBIG_SYSTEM = """You are a market entity resolver. You distinguish between different
 real-world organisations that share a similar name. You always respond with valid, parseable
 JSON only - no markdown, no prose, no explanation. Raw JSON only."""

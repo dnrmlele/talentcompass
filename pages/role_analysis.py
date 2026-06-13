@@ -2,9 +2,14 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-from services.claude_client import analyze_role, ClaudeClientError
+from services.claude_client import (
+    analyze_role,
+    analyze_hr_advisory,
+    ClaudeClientError,
+)
 from services.company_context import SIZE_OPTIONS
 from services import agent_library
+from services.workforce import compute_workforce_impact
 
 _ERROR_MESSAGES = {
     "auth": "Invalid Claude API key. Check the key in the sidebar and try again.",
@@ -91,6 +96,29 @@ def _apply_role_preset() -> None:
     st.session_state["rj_desc"] = p["desc"]
 
 
+def _attach_workforce(role: dict) -> None:
+    """Compute and attach deterministic workforce impact from the current inputs.
+    No-op (and clears any stale value) when headcount is 0."""
+    headcount = st.session_state.get("wf_headcount", 0) or 0
+    if not headcount:
+        role.pop("workforce", None)
+        return
+    role["workforce"] = compute_workforce_impact(
+        role,
+        headcount=headcount,
+        loaded_cost=st.session_state.get("wf_cost", 0),
+        reskill_cost_per_fte=st.session_state.get("wf_reskill", 0),
+        severance_months=st.session_state.get("wf_sev", 3.0),
+    )
+
+
+def _eur(v) -> str:
+    try:
+        return f"€{float(v):,.0f}"
+    except (TypeError, ValueError):
+        return "€0"
+
+
 def _init_role_inputs() -> None:
     for key, default in (
         ("rj_client", ""),
@@ -167,6 +195,39 @@ def render():
         key="rj_desc",
     )
 
+    with st.expander(
+        "Workforce inputs — for FTE, payroll & severance impact (optional)"
+    ):
+        st.caption(
+            "These drive the deterministic financial figures (real arithmetic on your "
+            "numbers, not AI estimates). Leave headcount at 0 to skip the impact section."
+        )
+        wcol1, wcol2 = st.columns(2)
+        wcol1.number_input(
+            "Headcount in this role", min_value=0, step=1, key="wf_headcount"
+        )
+        wcol2.number_input(
+            "Fully-loaded annual cost / FTE (EUR)",
+            min_value=0,
+            step=5000,
+            key="wf_cost",
+            help="Salary + employer charges + overhead.",
+        )
+        wcol3, wcol4 = st.columns(2)
+        wcol3.number_input(
+            "Reskilling / transition cost per freed FTE (EUR)",
+            min_value=0,
+            step=1000,
+            key="wf_reskill",
+        )
+        wcol4.number_input(
+            "Severance basis (months of cost)",
+            min_value=0.0,
+            step=1.0,
+            value=3.0,
+            key="wf_sev",
+        )
+
     with st.form("role_form"):
         submitted = st.form_submit_button(
             "Analyze Role", type="primary", use_container_width=True
@@ -215,6 +276,7 @@ def render():
                 result["_title"] = job_title
                 result["_dept"] = department
                 result["_client"] = client_name or "Not specified"
+                _attach_workforce(result)
                 st.session_state["last_role_result"] = result
                 if "org_roles" not in st.session_state:
                     st.session_state["org_roles"] = []
@@ -256,6 +318,96 @@ def render():
     c2.metric("AI-Augmented", f"{stats.get('ai_augmented_pct', 0)}%")
     c3.metric("Human-Only", f"{stats.get('human_only_pct', 0)}%")
     c4.metric("AI Agents Identified", len(r.get("ai_agents", [])))
+
+    # ── Workforce & financial impact (deterministic) ──────────────────────────
+    # Recompute live from current inputs so tweaks update without re-calling Claude.
+    _attach_workforce(r)
+    wf = r.get("workforce")
+    if wf:
+        st.markdown("### Workforce & Financial Impact")
+        st.caption(
+            "Computed from your headcount and loaded cost — real arithmetic, not an AI estimate."
+        )
+        w1, w2, w3, w4 = st.columns(4)
+        w1.metric("FTE freed", f"{wf['fte_freed']:.2f}")
+        w2.metric("Annual payroll savings", _eur(wf["annual_payroll_savings"]))
+        w3.metric("Net annual savings", _eur(wf["net_annual_savings"]))
+        w4.metric("Severance exposure", _eur(wf["severance_exposure"]))
+        st.caption(
+            f"Headcount {wf['headcount']}  ·  {wf['total_weekly_hours_freed']:.0f} h/week freed  ·  "
+            f"displaced (fully-automatable) {wf['displaced_fte']:.2f} FTE  ·  "
+            f"transition cost {_eur(wf['transition_cost'])} "
+            f"(reskill {_eur(wf['reskill_cost_per_fte'])}/FTE)  ·  "
+            f"severance basis {wf['severance_months']:.0f} months"
+        )
+    else:
+        st.caption(
+            "Add a headcount in **Workforce inputs** above to see FTE, payroll and severance impact."
+        )
+
+    # ── HR Management & Advisory (LLM, opt-in) ────────────────────────────────
+    st.markdown("### HR Management & Advisory")
+    adv = r.get("hr_advisory")
+    if not adv:
+        st.caption(
+            "Qualitative people guidance: redeployment, reskilling, change management, "
+            "retention and workforce planning. Generated on demand (one extra Claude call)."
+        )
+        if st.button("Generate HR advisory", key="gen_hr_advisory"):
+            api_key = st.session_state.get("api_key", "")
+            if not api_key:
+                st.error("Enter your Claude API key in the sidebar first.")
+            else:
+                with st.spinner("Generating HR advisory..."):
+                    try:
+                        r["hr_advisory"] = analyze_hr_advisory(
+                            api_key, r, r.get("workforce")
+                        )
+                        st.rerun()
+                    except ClaudeClientError as e:
+                        st.error(_ERROR_MESSAGES.get(e.kind, _ERROR_MESSAGES["api"]))
+    else:
+        if adv.get("summary"):
+            with st.container(border=True):
+                st.write(adv["summary"])
+        ac1, ac2 = st.columns(2)
+        with ac1:
+            if adv.get("redeployment_options"):
+                st.markdown("**Redeployment options**")
+                for o in adv["redeployment_options"]:
+                    st.markdown(
+                        f"- **{o.get('option', '')}** ({o.get('effort', '')}): {o.get('description', '')}"
+                    )
+            if adv.get("reskilling_focus"):
+                st.markdown("**Reskilling focus**")
+                for s in adv["reskilling_focus"]:
+                    st.markdown(f"- {s}")
+            if adv.get("workforce_planning"):
+                st.markdown("**Workforce planning**")
+                for s in adv["workforce_planning"]:
+                    st.markdown(f"- {s}")
+        with ac2:
+            if adv.get("retention_priorities"):
+                st.markdown("**Retention priorities**")
+                for p in adv["retention_priorities"]:
+                    st.markdown(
+                        f"- **{p.get('group', '')}** — {p.get('reason', '')}  →  {p.get('action', '')}"
+                    )
+            if adv.get("change_management"):
+                st.markdown("**Change management**")
+                for step in adv["change_management"]:
+                    st.markdown(f"- **{step.get('phase', '')}**")
+                    for a in step.get("actions", []):
+                        st.markdown(f"    - {a}")
+            if adv.get("hr_risks"):
+                st.markdown("**HR risks**")
+                for hr in adv["hr_risks"]:
+                    st.markdown(
+                        f"- {hr.get('risk', '')} → _{hr.get('mitigation', '')}_"
+                    )
+        if st.button("Regenerate HR advisory", key="regen_hr_advisory"):
+            r.pop("hr_advisory", None)
+            st.rerun()
 
     # ── Gauge + Task bar chart ────────────────────────────────────────────────
     tasks = r.get("tasks", [])

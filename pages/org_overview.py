@@ -2,6 +2,15 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 
+from services.workforce import rollup_workforce
+
+
+def _eur(v) -> str:
+    try:
+        return f"€{float(v):,.0f}"
+    except (TypeError, ValueError):
+        return "€0"
+
 
 def render():
     st.markdown("## Organization Overview")
@@ -10,24 +19,51 @@ def render():
     roles = st.session_state.get("org_roles", [])
 
     if not roles:
-        st.info("No roles analyzed yet. Run a Role Analysis first, then return here.", icon="ℹ️")
+        st.info(
+            "No roles analyzed yet. Run a Role Analysis first, then return here.",
+            icon="ℹ️",
+        )
         return
 
-# --- Summary table ---
+    # --- Org-wide workforce & financial rollup (deterministic) ---
+    total = rollup_workforce(roles)
+    if total["roles_with_data"]:
+        st.markdown("### Workforce & Financial Impact (org-wide)")
+        st.caption(
+            f"Summed across the {total['roles_with_data']} of {len(roles)} role(s) with headcount entered. "
+            "Real arithmetic on your numbers, not AI estimates."
+        )
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total FTE freed", f"{total['fte_freed']:.1f}")
+        m2.metric("Annual payroll savings", _eur(total["annual_payroll_savings"]))
+        m3.metric("Net annual savings", _eur(total["net_annual_savings"]))
+        m4.metric("Severance exposure", _eur(total["severance_exposure"]))
+        st.caption(
+            f"Headcount covered {total['headcount']:.0f}  ·  "
+            f"displaced (fully-automatable) {total['displaced_fte']:.1f} FTE  ·  "
+            f"transition cost {_eur(total['transition_cost'])}"
+        )
+        st.divider()
+
+    # --- Summary table ---
     rows = []
     for r in roles:
-        rows.append({
-            "Role": r.get("_title", ""),
-            "Client": r.get("_client", ""),
-            "Department": r.get("_dept", ""),
-            "Automation Score": r.get("automation_score", 0),
-            "Hours Saved / Week": r.get("weekly_hours_saved", 0),
-            "Priority": r.get("transformation_priority", ""),
-            "AI Agents": len(r.get("ai_agents", [])),
-            "Fully Automatable %": r.get("stats", {}).get("fully_automatable_pct", 0),
-            "AI-Augmented %": r.get("stats", {}).get("ai_augmented_pct", 0),
-            "Human-Only %": r.get("stats", {}).get("human_only_pct", 0),
-        })
+        rows.append(
+            {
+                "Role": r.get("_title", ""),
+                "Client": r.get("_client", ""),
+                "Department": r.get("_dept", ""),
+                "Automation Score": r.get("automation_score", 0),
+                "Hours Saved / Week": r.get("weekly_hours_saved", 0),
+                "Priority": r.get("transformation_priority", ""),
+                "AI Agents": len(r.get("ai_agents", [])),
+                "Fully Automatable %": r.get("stats", {}).get(
+                    "fully_automatable_pct", 0
+                ),
+                "AI-Augmented %": r.get("stats", {}).get("ai_augmented_pct", 0),
+                "Human-Only %": r.get("stats", {}).get("human_only_pct", 0),
+            }
+        )
     df = pd.DataFrame(rows)
 
     # Automation score bar chart
@@ -65,9 +101,17 @@ def render():
     st.plotly_chart(fig2, use_container_width=True)
 
     # Stacked distribution
-    df_stacked = df[["Role", "Fully Automatable %", "AI-Augmented %", "Human-Only %"]].copy()
-    df_melted = df_stacked.melt(id_vars="Role", var_name="Category", value_name="Percentage")
-    color_map = {"Fully Automatable %": "#01696f", "AI-Augmented %": "#d19900", "Human-Only %": "#c0beba"}
+    df_stacked = df[
+        ["Role", "Fully Automatable %", "AI-Augmented %", "Human-Only %"]
+    ].copy()
+    df_melted = df_stacked.melt(
+        id_vars="Role", var_name="Category", value_name="Percentage"
+    )
+    color_map = {
+        "Fully Automatable %": "#01696f",
+        "AI-Augmented %": "#d19900",
+        "Human-Only %": "#c0beba",
+    }
     fig3 = px.bar(
         df_melted,
         x="Percentage",
@@ -79,16 +123,20 @@ def render():
         title="Task Distribution Breakdown",
         height=max(300, len(roles) * 60),
     )
-    fig3.update_layout(margin=dict(l=0, r=40, t=40, b=0), legend=dict(orientation="h", y=-0.2))
+    fig3.update_layout(
+        margin=dict(l=0, r=40, t=40, b=0), legend=dict(orientation="h", y=-0.2)
+    )
     st.plotly_chart(fig3, use_container_width=True)
 
-# --- Role cards ---
+    # --- Role cards ---
     st.markdown("### Role Detail Cards")
     cols = st.columns(min(len(roles), 3))
     for i, r in enumerate(roles):
         score = r.get("automation_score", 0)
         priority = r.get("transformation_priority", "Medium")
-        score_color = "#a12c7b" if score >= 75 else "#da7101" if score >= 55 else "#01696f"
+        score_color = (
+            "#a12c7b" if score >= 75 else "#da7101" if score >= 55 else "#01696f"
+        )
         with cols[i % 3]:
             with st.container(border=True):
                 st.markdown(f"**{r.get('_title', '')}**")
@@ -98,11 +146,12 @@ def render():
                     unsafe_allow_html=True,
                 )
                 st.markdown(f"**{priority} priority**")
-                st.caption(f"{r.get('weekly_hours_saved', 0)} hours saved/week  -  {len(r.get('ai_agents', []))} agents")
+                st.caption(
+                    f"{r.get('weekly_hours_saved', 0)} hours saved/week  -  {len(r.get('ai_agents', []))} agents"
+                )
 
-# --- Clear session ---
+    # --- Clear session ---
     if st.button("Clear all roles", type="secondary"):
         st.session_state["org_roles"] = []
         st.session_state.pop("last_role_result", None)
         st.rerun()
-

@@ -1,5 +1,6 @@
-/* ── 1. Font import must be first ── */
-@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800&display=swap');
+/* ── 1. Font import must be first ──
+   Open Sans is the Deloitte corporate digital typeface. */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&display=swap');
 
 /* ── 2. CSS variables ── */
 :root {
@@ -15,8 +16,8 @@
 /* ── 3. Typography ── */
 html,
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        "Helvetica Neue", Arial, sans-serif;
+    font-family: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
 }
 
 [data-baseweb],
@@ -25,8 +26,8 @@ body {
 [data-testid="stPopover"] *,
 [data-testid="stPopoverBody"],
 [data-testid="stPopoverBody"] * {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        "Helvetica Neue", Arial, sans-serif !important;
+    font-family: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif !important;
 }
 
 /* Restore the Material Symbols font on icon elements. The broad [data-baseweb] *
@@ -61,11 +62,11 @@ span.material-symbols-outlined,
 [data-testid="stExpander"] .stMarkdown *,
 [data-testid="stSidebar"] .stMarkdown,
 [data-testid="stSidebar"] .stMarkdown * {
-    font-family: "Cabinet Grotesk", sans-serif !important;
+    font-family: "Open Sans", sans-serif !important;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: "Cabinet Grotesk", sans-serif !important;
+    font-family: "Open Sans", sans-serif !important;
     font-weight: 800 !important;
     color: var(--dtt-black) !important;
 }
@@ -122,7 +123,7 @@ input::placeholder { color: #AAAAAA !important; }
 .stTextInput > label,
 .stSelectbox > label,
 .stTextArea > label {
-    font-family: "Cabinet Grotesk", sans-serif !important;
+    font-family: "Open Sans", sans-serif !important;
     color: var(--dtt-black) !important;
     font-weight: 600 !important;
     font-size: 0.85rem !important;
@@ -213,7 +214,7 @@ div[role="radiogroup"] label {
     padding: 10px 14px !important;
     cursor: pointer !important;
     color: var(--dtt-black) !important;
-    font-family: "Cabinet Grotesk", sans-serif !important;
+    font-family: "Open Sans", sans-serif !important;
     font-weight: 600 !important;
     font-size: 0.88rem !important;
     background: var(--dtt-white) !important;
@@ -248,9 +249,9 @@ div[role="radiogroup"] input[type="radio"] {
 }
 [data-testid="stAlert"][data-type="info"],
 .stInfo > div {
-    background-color: #EBF4FB !important;
-    border-left: 4px solid #2980b9 !important;
-    color: #1a4f72 !important;
+    background-color: #E7F3F9 !important;
+    border-left: 4px solid #0076A8 !important;  /* Deloitte Blue */
+    color: #00496b !important;
     border-radius: 6px !important;
 }
 [data-testid="stAlert"][data-type="warning"],
@@ -317,7 +318,7 @@ hr {
 [data-testid="stTabs"] button[role="tab"] {
     display: inline-flex !important;
     visibility: visible !important;
-    font-family: "Cabinet Grotesk", sans-serif !important;
+    font-family: "Open Sans", sans-serif !important;
     font-weight: 600 !important;
     font-size: 0.9rem !important;
     color: #777777 !important;
@@ -373,4 +374,215 @@ iframe[height="55"],
 iframe[width="55"],
 iframe[style*="position: fixed"] {
     display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   22. PREMIUM LAYER — high-end visual pass
+   Soft Structuralism vibe: white canvas, massive grotesk type, airy floating
+   components with diffused ambient shadows, double-bezel cards, pill CTAs and
+   spring-curve motion. Everything here is additive and overrides the base above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* spring curve reused everywhere (no linear / ease-in-out) */
+    --tc-spring: cubic-bezier(0.32, 0.72, 0, 1);
+    /* layered ambient shadows — soft + diffused, never harsh/dark */
+    --tc-shadow-soft:
+        0 1px 2px rgba(26, 26, 26, 0.04),
+        0 10px 30px -16px rgba(26, 26, 26, 0.16);
+    --tc-shadow-lift:
+        0 2px 6px rgba(26, 26, 26, 0.06),
+        0 22px 48px -20px rgba(26, 26, 26, 0.24);
+    --tc-hairline: rgba(26, 26, 26, 0.06);
+    --tc-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* ── 22a. Macro-whitespace: let the canvas breathe ── */
+[data-testid="stMain"] .block-container {
+    padding-top: 3.5rem !important;
+    padding-bottom: 5rem !important;
+    max-width: 1180px !important;
+}
+[data-testid="stMain"] [data-testid="stVerticalBlock"] {
+    gap: 1.15rem !important;
+}
+
+/* ── 22b. Type scale: bigger, tighter, more hierarchy ── */
+[data-testid="stMain"] h1 {
+    font-size: 2.7rem !important;
+    line-height: 1.04 !important;
+    letter-spacing: -0.02em !important;
+    margin-bottom: 0.35rem !important;
+}
+[data-testid="stMain"] h2 {
+    font-size: 1.85rem !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.015em !important;
+    margin-top: 0.4rem !important;
+}
+[data-testid="stMain"] h3 {
+    font-size: 1.28rem !important;
+    letter-spacing: -0.01em !important;
+}
+
+/* ── 22c. Eyebrow utility (use in st.markdown) ──
+   <span class="tc-eyebrow">Session report</span> */
+.tc-eyebrow {
+    display: inline-block;
+    background: var(--dtt-green-light);
+    color: var(--dtt-green-dark);
+    font-family: "Open Sans", sans-serif;
+    font-weight: 700;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    padding: 5px 11px;
+    border-radius: 999px;
+    box-shadow: var(--tc-inner-highlight);
+}
+
+/* ── 22d. Double-bezel cards: bordered containers float as machined hardware ── */
+[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"]:has(> div) {
+    border: 1px solid var(--tc-hairline) !important;
+    border-radius: 20px !important;
+    background:
+        linear-gradient(180deg, #ffffff 0%, #fcfdfb 100%) !important;
+    box-shadow: var(--tc-shadow-soft), var(--tc-inner-highlight) !important;
+    padding: 6px !important;
+    transition: transform 0.5s var(--tc-spring),
+        box-shadow 0.5s var(--tc-spring) !important;
+}
+/* inner core of the bezel */
+[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"]:has(> div) > div {
+    background: var(--dtt-white) !important;
+    border-radius: 15px !important;
+    padding: 1.15rem 1.3rem !important;
+}
+[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"]:has(> div):hover {
+    transform: translateY(-3px) !important;
+    box-shadow: var(--tc-shadow-lift), var(--tc-inner-highlight) !important;
+}
+
+/* ── 22e. Metric cards: floating, soft, hairline (no harsh 1px grey) ── */
+[data-testid="stMetric"] {
+    border: 1px solid var(--tc-hairline) !important;
+    border-radius: 16px !important;
+    padding: 18px 22px !important;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdf7 100%) !important;
+    box-shadow: var(--tc-shadow-soft), var(--tc-inner-highlight) !important;
+    transition: transform 0.5s var(--tc-spring),
+        box-shadow 0.5s var(--tc-spring) !important;
+}
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--tc-shadow-lift), var(--tc-inner-highlight) !important;
+}
+[data-testid="stMetricValue"] {
+    font-size: 2.05rem !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* ── 22f. Pill CTAs with spring lift (primary + form submit) ── */
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="baseButton-primary"],
+[data-testid="stFormSubmitButton"] > button {
+    border-radius: 999px !important;
+    padding: 0.62rem 1.5rem !important;
+    box-shadow: var(--tc-shadow-soft) !important;
+    transition: transform 0.45s var(--tc-spring),
+        box-shadow 0.45s var(--tc-spring),
+        background-color 0.45s var(--tc-spring) !important;
+}
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="baseButton-primary"]:hover,
+[data-testid="stFormSubmitButton"] > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 26px -8px rgba(134, 188, 37, 0.55) !important;
+}
+.stButton > button:active,
+[data-testid="stFormSubmitButton"] > button:active {
+    transform: scale(0.985) !important;
+}
+.stButton > button[kind="secondary"],
+.stButton > button[data-testid="baseButton-secondary"] {
+    border-radius: 999px !important;
+    padding: 0.55rem 1.35rem !important;
+    transition: transform 0.45s var(--tc-spring),
+        border-color 0.45s var(--tc-spring),
+        color 0.45s var(--tc-spring) !important;
+}
+
+/* ── 22g. Radio nav: spring motion + soft active shadow ── */
+div[role="radiogroup"] label {
+    border-radius: 12px !important;
+    transition: transform 0.4s var(--tc-spring),
+        border-color 0.4s var(--tc-spring),
+        background 0.4s var(--tc-spring),
+        box-shadow 0.4s var(--tc-spring) !important;
+}
+div[role="radiogroup"] label:hover {
+    transform: translateX(2px) !important;
+}
+div[role="radiogroup"] label:has(input[type="radio"]:checked) {
+    box-shadow: 0 6px 16px -8px rgba(134, 188, 37, 0.6) !important;
+}
+
+/* ── 22h. Inputs: softer, larger radius, spring focus ── */
+input[type="text"],
+input[type="password"],
+textarea,
+[data-testid="stTextInput"] input {
+    border-radius: 12px !important;
+    transition: border-color 0.4s var(--tc-spring),
+        box-shadow 0.4s var(--tc-spring) !important;
+}
+
+/* ── 22i. Expanders as soft cards ── */
+[data-testid="stExpander"] details {
+    border: 1px solid var(--tc-hairline) !important;
+    border-radius: 16px !important;
+    box-shadow: var(--tc-shadow-soft) !important;
+    overflow: hidden !important;
+    background: var(--dtt-white) !important;
+    transition: box-shadow 0.5s var(--tc-spring) !important;
+}
+[data-testid="stExpander"] details:hover {
+    box-shadow: var(--tc-shadow-lift) !important;
+}
+[data-testid="stExpander"] details > summary {
+    padding: 0.85rem 1.1rem !important;
+}
+
+/* ── 22j. Dividers: lighter, airier ── */
+hr {
+    border-top: 1px solid var(--tc-hairline) !important;
+    margin: 1.6rem 0 !important;
+}
+
+/* ── 22k. Tabs: pill underline rhythm ── */
+[data-testid="stTabs"] button[role="tab"] {
+    transition: color 0.4s var(--tc-spring),
+        border-color 0.4s var(--tc-spring) !important;
+}
+
+/* ── 22l. Sidebar: subtle inner depth ── */
+[data-testid="stSidebar"] {
+    box-shadow: inset -1px 0 0 var(--tc-hairline) !important;
+}
+
+/* ── 22m. Entry motion: content fades up on rerun (transform/opacity only) ── */
+@keyframes tc-fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+[data-testid="stMain"] .block-container > div {
+    animation: tc-fade-up 0.6s var(--tc-spring) both;
+}
+
+/* ── 22n. Respect reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+    }
 }

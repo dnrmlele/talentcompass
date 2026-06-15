@@ -311,6 +311,27 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 
 **Split honoured:** financial figures = pure maths (defensible, reproducible); advisory = LLM (qualitative, opt-in). Clean separation so a client deliverable can show the computed numbers with confidence and the advisory as guidance.
 
+## WO-15 (Opus 4.8, 2026-06-15/16) — DONE
+
+**Design refresh + Deloitte branding + white-label.** Out-of-band polish pass (not a graph WO); triggered by "PDF output not usable, text overflows, no charts" + follow-ups.
+
+**PDF (`services/pdf/*`):**
+- Root cause of "overflow": `multi_cell` defaulted to `Align.J` (justified) → gappy text. Fixed to left-align everywhere. Also fixed a latent page-break bug — `header()` now resets the cursor to `t_margin` so auto-break pages don't collide with the green band.
+- Added a **native vector chart toolkit** to `base.py` (deterministic, no raster/charting dep — preserves golden-test reproducibility): `_kpi_tiles` (double-bezel cards), `_gauge` (donut via `solid_arc`, calibrated clockwise-from-top), `_meter`, `_hbar_chart` (brand colours + `fmt` EUR hook), `_eyebrow`, `_record_title`, `_cover`; `_need()` page-break guard + group keep-together.
+- `sections.py` rewritten to use them (task breakdown + financials as charts, KPI tiles); multi-record/combined builders open with a cover page.
+
+**Branding:**
+- **Font → Open Sans** (Deloitte corporate typeface) app-wide: `main.css` Google Fonts import, Plotly `font.family`, and bundled `assets/fonts/OpenSans-Regular/Bold.ttf` for the PDF (replaced DejaVu as the PDF family).
+- **Palette scrub:** every off-brand chart colour (amber `#d19900`, magenta `#a12c7b`, teal `#01696f`, orange/purple) → official Deloitte secondary set (green/blue/cool-grey) in `pdf/base.py`, `org_overview.py`, `role_analysis.py`, `client_research.py`.
+- **Premium CSS layer** (`main.css` §22): ambient shadows, double-bezel cards, pill CTAs, `cubic-bezier` motion, type scale, reduced-motion guard.
+- **White-label:** scrubbed every user-facing "Claude" mention (API-key label, model selector → Fast/Quality, captions, spinners, error messages) across `app.py` + pages. Code identifiers (`claude_client`, `ClaudeClientError`) and model-id values kept.
+
+**Verification:** 61/61 pytest; PDF goldens reseeded (visual+font+palette changes alter bytes by design) and confirmed deterministic on re-run; role + company PDFs and the Streamlit landing visually verified (preview screenshots). black clean.
+
+**Files:** `services/pdf/base.py`, `services/pdf/sections.py`, `services/pdf/builders.py`, `styles/main.css`, `pages/role_analysis.py`, `pages/client_research.py`, `pages/org_overview.py`, `app.py`, `assets/fonts/OpenSans-*.ttf` (new), `tests/golden/checksums.json` (reseeded). `_safe()` nbsp key restored to literal `\xa0` (regression caught by `test_pdf_safe.py`).
+
+**Open:** PDF emoji/non-Latin glyphs render `.notdef` under Open Sans (no crash) — DejaVu kept on disk if full-Unicode coverage is ever needed. Internal code/docstring "Claude" references left as-is (accurate; not user-facing).
+
 ## Coordinator log
 
 - 2026-06-12: Plan created. Wave 1 (WO-01, WO-04) released.
@@ -335,3 +356,4 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 - 2026-06-13: Committed WO-10/10b/11/12 to branch talentcompass-v2 (commit 42c1c5b; prior 7e9e681 held WO-01..09 + infra). First commit message mangled (PowerShell here-string in Bash tool) → amended clean.
 - 2026-06-13: graphify . --update run after WO-13 role slice — 34 changed files (30 code + 4 docs, 1 semantic subagent). Graph 87→347 nodes, 690 edges, 17 communities. New god nodes surfaced: _Base, get_store, compute_workforce_impact, ClaudeClientError. Outputs (graph.html/json, GRAPH_REPORT.md) refreshed; ~50k tokens incremental.
 - 2026-06-13: WO-13 + WO-14 DONE. Workforce maths (deterministic FTE/payroll/severance + org rollup) and HR advisory (LLM, opt-in). 61/61 pytest; goldens green (guarded PDF blocks); byte-identity preserved. 15 work orders DONE total. Uncommitted since the v2 commit — WO-13/14 + graphify-out refresh not yet committed.
+- 2026-06-15/16: WO-15 DONE (design refresh, out-of-band). Fixed PDF text overflow (justified→left) + a latent auto-page-break/header collision; added a deterministic native vector chart toolkit (KPI tiles, donut gauge, bar charts) + cover page; swapped typography to Open Sans (Deloitte font) app + PDF; scrubbed all off-brand chart colours to the Deloitte secondary palette; added a premium high-end CSS layer; white-labelled the UI (no LLM vendor named). 61/61 pytest; goldens reseeded + deterministic; PDFs and landing visually verified. Docs (CLAUDE.md, README.md, this file) updated. Still uncommitted.

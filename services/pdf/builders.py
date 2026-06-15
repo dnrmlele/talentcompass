@@ -5,15 +5,37 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any
 
-from services.pdf.base import _DeloittePDF, _ts, _safe, _h, DTT_GREY, DTT_BLACK
+from services.pdf.base import (
+    _DeloittePDF,
+    _ts,
+    _safe,
+    _h,
+    _cover,
+    DTT_GREY,
+    DTT_BLACK,
+)
 from services.pdf.sections import _write_role_section, _write_company_section
 
 
 def build_roles_pdf(roles: list[dict[str, Any]]) -> bytes:
     pdf = _DeloittePDF(subtitle="Role automation analyses")
+    # A multi-record export opens with a premium cover; a single record stays
+    # compact (the single-role download delegates here with one item).
+    if len(roles) > 1:
+        _cover(
+            pdf,
+            "Session report",
+            "Role Automation Analyses",
+            "AI workforce intelligence across the roles assessed in this session.",
+            [
+                f"Generated  {_ts()}",
+                f"{len(roles)} role analysis record(s)",
+                "Deloitte Luxembourg",
+            ],
+        )
     pdf.add_page()
     pdf.set_y(28)
-    pdf.set_font("DejaVu", "", 9)
+    pdf.set_font("OpenSans", "", 9)
     pdf.set_text_color(*DTT_GREY)
     pdf.multi_cell(
         0, 4, text=_safe(f"Generated: {_ts()}  -  {len(roles)} role analysis record(s)")
@@ -29,9 +51,21 @@ def build_roles_pdf(roles: list[dict[str, Any]]) -> bytes:
 
 def build_companies_pdf(companies: list[dict[str, Any]]) -> bytes:
     pdf = _DeloittePDF(subtitle="Client research")
+    if len(companies) > 1:
+        _cover(
+            pdf,
+            "Session report",
+            "Client Research",
+            "Market intelligence and AI-transformation potential for the clients reviewed.",
+            [
+                f"Generated  {_ts()}",
+                f"{len(companies)} client research record(s)",
+                "Deloitte Luxembourg",
+            ],
+        )
     pdf.add_page()
     pdf.set_y(28)
-    pdf.set_font("DejaVu", "", 9)
+    pdf.set_font("OpenSans", "", 9)
     pdf.set_text_color(*DTT_GREY)
     pdf.multi_cell(
         0,
@@ -54,9 +88,20 @@ def build_combined_pdf(
     companies: list[dict[str, Any]],
 ) -> bytes:
     pdf = _DeloittePDF(subtitle="Full session report")
+    _cover(
+        pdf,
+        "Session report",
+        "AI Workforce Intelligence",
+        "A combined view of role automation analyses and client research from this session.",
+        [
+            f"Generated  {_ts()}",
+            f"{len(roles)} role analysis record(s)  -  {len(companies)} client research record(s)",
+            "Deloitte Luxembourg",
+        ],
+    )
     pdf.add_page()
     pdf.set_y(28)
-    pdf.set_font("DejaVu", "", 9)
+    pdf.set_font("OpenSans", "", 9)
     pdf.set_text_color(*DTT_GREY)
     pdf.multi_cell(
         0,

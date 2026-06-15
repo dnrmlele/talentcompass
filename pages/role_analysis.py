@@ -12,10 +12,10 @@ from services import agent_library
 from services.workforce import compute_workforce_impact
 
 _ERROR_MESSAGES = {
-    "auth": "Invalid Claude API key. Check the key in the sidebar and try again.",
-    "rate_limit": "Claude is rate-limited right now. Wait a moment and retry.",
-    "bad_json": "Claude returned an unreadable response. Please retry the analysis.",
-    "api": "Claude API call failed. Check your connection and try again.",
+    "auth": "Invalid API key. Check the key in the sidebar and try again.",
+    "rate_limit": "The model is rate-limited right now. Wait a moment and retry.",
+    "bad_json": "The model returned an unreadable response. Please retry the analysis.",
+    "api": "The API call failed. Check your connection and try again.",
 }
 
 PRESETS = {
@@ -71,10 +71,12 @@ PRESETS = {
     },
 }
 
+# Deloitte data-viz palette: green is the accent, blue the second category,
+# cool grey the neutral. No amber/teal/magenta.
 SCORE_COLORS = {
-    "Fully Automatable": "#01696f",
-    "AI-Augmented": "#d19900",
-    "Human-Only": "#8a8a8a",
+    "Fully Automatable": "#046A38",  # Deloitte Green 7
+    "AI-Augmented": "#0076A8",       # Deloitte Blue
+    "Human-Only": "#75787B",         # Deloitte Cool Gray 9
 }
 
 # ── Shared Plotly layout defaults ─────────────────────────────────────────────
@@ -82,7 +84,7 @@ _PLOTLY_BASE = dict(
     template="plotly_white",
     paper_bgcolor="white",
     plot_bgcolor="white",
-    font=dict(color="#1A1A1A", family="Cabinet Grotesk, sans-serif", size=12),
+    font=dict(color="#1A1A1A", family="Open Sans, sans-serif", size=12),
 )
 
 
@@ -145,7 +147,7 @@ def _init_role_inputs() -> None:
 def render():
     st.markdown("## Role Automation Analysis")
     st.caption(
-        "Every assessment is generated live by Claude based on the exact role description you provide."
+        "Every assessment is generated live from the exact role description you provide."
     )
 
     _init_role_inputs()
@@ -189,7 +191,7 @@ def render():
         height=220,
         placeholder=(
             "Paste the real job description or list the main responsibilities. "
-            "Claude will base its analysis on this text - the more specific, "
+            "The analysis is based on this text - the more specific, "
             "the more accurate and defensible the output."
         ),
         key="rj_desc",
@@ -236,7 +238,7 @@ def render():
     if submitted:
         api_key = st.session_state.get("api_key", "")
         if not api_key:
-            st.error("Enter your Claude API key in the sidebar first.")
+            st.error("Enter your API key in the sidebar first.")
             return
 
         job_title = (st.session_state.get("rj_title") or "").strip()
@@ -263,7 +265,7 @@ def render():
         if company_size not in SIZE_OPTIONS:
             company_size = "SME"
 
-        with st.spinner("Calling Claude for a live role assessment..."):
+        with st.spinner("Generating a live role assessment..."):
             try:
                 result = analyze_role(
                     api_key=api_key,
@@ -308,7 +310,7 @@ def render():
         st.markdown("**Executive Summary**")
         st.write(r.get("summary", ""))
         st.caption(
-            "Live Claude assessment  -  Generated from your exact role description"
+            "Live assessment  -  Generated from your exact role description"
         )
 
     # ── Stat metrics ──────────────────────────────────────────────────────────
@@ -351,12 +353,12 @@ def render():
     if not adv:
         st.caption(
             "Qualitative people guidance: redeployment, reskilling, change management, "
-            "retention and workforce planning. Generated on demand (one extra Claude call)."
+            "retention and workforce planning. Generated on demand (one extra API call)."
         )
         if st.button("Generate HR advisory", key="gen_hr_advisory"):
             api_key = st.session_state.get("api_key", "")
             if not api_key:
-                st.error("Enter your Claude API key in the sidebar first.")
+                st.error("Enter your API key in the sidebar first.")
             else:
                 with st.spinner("Generating HR advisory..."):
                     try:
@@ -416,7 +418,7 @@ def render():
     with col_gauge:
         score = r.get("automation_score", 0)
         gauge_color = (
-            "#a12c7b" if score >= 75 else "#da7101" if score >= 55 else "#01696f"
+            "#046A38" if score >= 75 else "#86BC25" if score >= 55 else "#75787B"
         )
         fig_gauge = go.Figure(
             go.Indicator(
@@ -427,9 +429,9 @@ def render():
                     "bar": {"color": gauge_color},
                     "bgcolor": "#F7F7F7",
                     "steps": [
-                        {"range": [0, 45], "color": "#e6f4f4"},
-                        {"range": [45, 70], "color": "#fef6e0"},
-                        {"range": [70, 100], "color": "#f5dded"},
+                        {"range": [0, 45], "color": "#F2F8E8"},
+                        {"range": [45, 70], "color": "#DDEFE8"},
+                        {"range": [70, 100], "color": "#C5E0A0"},
                     ],
                 },
                 title={
@@ -577,7 +579,7 @@ def render():
     # ── Transformation Roadmap ────────────────────────────────────────────────
     st.markdown("### Transformation Roadmap")
     roadmap = r.get("roadmap", [])
-    phase_colors = ["#01696f", "#d19900", "#006494"]
+    phase_colors = ["#046A38", "#86BC25", "#0076A8"]
     road_cols = st.columns(len(roadmap)) if roadmap else []
     for i, phase in enumerate(roadmap):
         with road_cols[i] if road_cols else st.container():
@@ -594,12 +596,12 @@ def render():
     # ── Risk & Change Management ──────────────────────────────────────────────
     st.markdown("### Risk & Change Management")
     risks = r.get("risks", [])
-    risk_colors = {"change": "#964219", "data": "#da7101", "compliance": "#006494"}
+    risk_colors = {"change": "#75787B", "data": "#0076A8", "compliance": "#046A38"}
     risk_cols = st.columns(len(risks)) if risks else []
     for i, risk in enumerate(risks):
         with risk_cols[i] if risk_cols else st.container():
             with st.container(border=True):
-                c = risk_colors.get(risk.get("color_key", ""), "#01696f")
+                c = risk_colors.get(risk.get("color_key", ""), "#046A38")
                 st.markdown(
                     f"<div style='color:{c};font-weight:700'>{risk.get('title', '')}</div>",
                     unsafe_allow_html=True,

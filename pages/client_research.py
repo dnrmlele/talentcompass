@@ -16,10 +16,10 @@ def _market_label(key: str) -> str:
 
 
 _ERROR_MESSAGES = {
-    "auth": "Invalid Claude API key. Check the key in the sidebar and try again.",
-    "rate_limit": "Claude is rate-limited right now. Wait a moment and retry.",
-    "bad_json": "Claude returned an unreadable response. Please retry the research.",
-    "api": "Claude API call failed. Check your connection and try again.",
+    "auth": "Invalid API key. Check the key in the sidebar and try again.",
+    "rate_limit": "The model is rate-limited right now. Wait a moment and retry.",
+    "bad_json": "The model returned an unreadable response. Please retry the research.",
+    "api": "The API call failed. Check your connection and try again.",
 }
 
 
@@ -53,7 +53,7 @@ def render():
     st.markdown("## Client Research")
     st.caption(
         "Enter a client name to generate a Luxembourg-focused AI potential assessment, "
-        "competitor intelligence, and strategic recommendations - all generated live from Claude."
+        "competitor intelligence, and strategic recommendations - all generated live."
     )
 
     col1, col2 = st.columns(2)
@@ -96,7 +96,7 @@ def render():
 
     if find:
         if not api_key:
-            st.error("Enter your Claude API key in the sidebar first.")
+            st.error("Enter your API key in the sidebar first.")
         elif not client_name:
             st.error("Client name is required.")
         else:
@@ -141,7 +141,7 @@ def render():
             "Research selected entity", type="primary", key="research_selected"
         ):
             if not api_key:
-                st.error("Enter your Claude API key in the sidebar first.")
+                st.error("Enter your API key in the sidebar first.")
             else:
                 _run_research(
                     api_key,
@@ -152,7 +152,7 @@ def render():
 
     if research:
         if not api_key:
-            st.error("Enter your Claude API key in the sidebar first.")
+            st.error("Enter your API key in the sidebar first.")
         elif not client_name:
             st.error("Client name is required.")
         else:
@@ -182,7 +182,7 @@ def render():
     score = r.get("ai_potential_score", 0)
     with col_gauge:
         gauge_color = (
-            "#a12c7b" if score >= 75 else "#da7101" if score >= 55 else "#01696f"
+            "#046A38" if score >= 75 else "#86BC25" if score >= 55 else "#75787B"
         )
         fig = go.Figure(
             go.Indicator(
@@ -191,11 +191,11 @@ def render():
                 gauge={
                     "axis": {"range": [0, 100]},
                     "bar": {"color": gauge_color},
-                    "bgcolor": "#f3f0ec",
+                    "bgcolor": "#F7F7F7",
                     "steps": [
-                        {"range": [0, 40], "color": "#e6f4f4"},
-                        {"range": [40, 70], "color": "#fef6e0"},
-                        {"range": [70, 100], "color": "#f5dded"},
+                        {"range": [0, 40], "color": "#F2F8E8"},
+                        {"range": [40, 70], "color": "#DDEFE8"},
+                        {"range": [70, 100], "color": "#C5E0A0"},
                     ],
                 },
                 title={"text": "AI Potential"},
@@ -247,13 +247,13 @@ def render():
     st.markdown("### Key AI Opportunities")
     opps = r.get("key_ai_opportunities", [])
     priority_colors = {
-        "Quick Win": "#437a22",
-        "Strategic": "#006494",
-        "Long-term": "#7a39bb",
+        "Quick Win": "#86BC25",   # Deloitte Green
+        "Strategic": "#0076A8",   # Deloitte Blue
+        "Long-term": "#2C5234",   # Deloitte Green deep
     }
     for opp in opps:
         priority = opp.get("priority", "Strategic")
-        color = priority_colors.get(priority, "#01696f")
+        color = priority_colors.get(priority, "#046A38")
         with st.container(border=True):
             c1, c2 = st.columns([3, 1])
             with c1:

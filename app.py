@@ -81,17 +81,17 @@ with st.sidebar:
     st.divider()
 
     api_key = st.text_input(
-        "Claude API Key",
+        "API Key",
         type="password",
         placeholder="sk-ant-...",
-        help="Your key is stored only in this browser session and sent directly to Anthropic.",
+        help="Your key is stored only in this browser session and sent directly to the model provider.",
         value=st.session_state.get("api_key", ""),
     )
     if api_key:
         st.session_state["api_key"] = api_key
         st.success("✓ API key loaded")
     else:
-        st.warning("Enter your Claude API key to begin.")
+        st.warning("Enter your API key to begin.")
 
     st.divider()
 
@@ -102,8 +102,8 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     MODEL_OPTIONS = {
-        "claude-haiku-4-5 (fast)": "claude-haiku-4-5",
-        "claude-opus-4-5 (quality)": "claude-opus-4-5",
+        "Fast": "claude-haiku-4-5",
+        "Quality": "claude-opus-4-5",
     }
     model_label = st.selectbox(
         "model_select",
@@ -111,7 +111,7 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     st.session_state["model"] = MODEL_OPTIONS[model_label]
-    st.caption("Haiku: fast, low cost · Opus: higher quality, ~10-15x the cost.")
+    st.caption("Fast: low cost · Quality: higher accuracy, ~10-15x the cost.")
 
     st.divider()
 
@@ -188,7 +188,7 @@ with st.sidebar:
                 st.error(f"Import failed: {e}")
 
     st.divider()
-    st.caption("Built for Deloitte Luxembourg · Powered by Claude")
+    st.caption("Built for Deloitte Luxembourg")
     st.caption("UI: presets + client-research sync (reloads code each run)")
 
 # ── Page routing ───────────────────────────────────────────────────────────────

@@ -73,7 +73,7 @@ def render():
         y="Role",
         orientation="h",
         color="Automation Score",
-        color_continuous_scale=["#01696f", "#d19900", "#a12c7b"],
+        color_continuous_scale=["#DDEFE8", "#86BC25", "#046A38"],
         range_color=[0, 100],
         text="Automation Score",
         title="Automation Potential by Role",
@@ -91,7 +91,7 @@ def render():
         y="Role",
         orientation="h",
         color="Hours Saved / Week",
-        color_continuous_scale=["#e6f4f4", "#01696f"],
+        color_continuous_scale=["#DDEFE8", "#046A38"],
         text="Hours Saved / Week",
         title="Weekly Hours Saved per Employee",
         height=max(300, len(roles) * 60),
@@ -108,9 +108,9 @@ def render():
         id_vars="Role", var_name="Category", value_name="Percentage"
     )
     color_map = {
-        "Fully Automatable %": "#01696f",
-        "AI-Augmented %": "#d19900",
-        "Human-Only %": "#c0beba",
+        "Fully Automatable %": "#046A38",
+        "AI-Augmented %": "#0076A8",
+        "Human-Only %": "#75787B",
     }
     fig3 = px.bar(
         df_melted,
@@ -135,7 +135,7 @@ def render():
         score = r.get("automation_score", 0)
         priority = r.get("transformation_priority", "Medium")
         score_color = (
-            "#a12c7b" if score >= 75 else "#da7101" if score >= 55 else "#01696f"
+            "#046A38" if score >= 75 else "#86BC25" if score >= 55 else "#75787B"
         )
         with cols[i % 3]:
             with st.container(border=True):

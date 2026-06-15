@@ -7,11 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **TalentCompass** is a Python web app for AI workforce intelligence and HR advisory, built with:
 
 - **Framework**: Streamlit (v1.35+) — single-page UI with sidebar navigation
-- **LLM Integration**: Anthropic Claude API. Model is selectable at runtime (sidebar): `claude-haiku-4-5` (default, fast) or `claude-opus-4-5` (quality).
-- **Validation**: pydantic v2 — every Claude JSON response is validated against a schema (`services/schemas.py`) at the API boundary.
-- **Data & Visualization**: Plotly (v5.22+), Pandas (v2.2+)
-- **PDF Export**: fpdf2 (v2.8+) with custom Deloitte-branded templates
-- **Styling**: Custom CSS (Deloitte brand); Cabinet Grotesk via Fontshare. Light theme pinned in `.streamlit/config.toml`.
+- **LLM Integration**: Anthropic Claude API (the engine). Model is selectable at runtime (sidebar), shown to users as **Fast** (`claude-haiku-4-5`, default) / **Quality** (`claude-opus-4-5`). The end-user UI is **white-labelled** — no LLM vendor name is surfaced; model ids live only in code.
+- **Validation**: pydantic v2 — every LLM JSON response is validated against a schema (`services/schemas.py`) at the API boundary.
+- **Data & Visualization**: Plotly (v5.22+), Pandas (v2.2+). All charts use the **Deloitte data-viz palette** (green accent, blue 2nd category, cool grey neutral — no off-brand amber/teal/magenta).
+- **PDF Export**: fpdf2 (v2.8+) with custom Deloitte-branded templates and a **native vector chart toolkit** (KPI tiles, donut gauge, meter + bar charts) — deterministic, no raster/charting dep.
+- **Styling**: Custom CSS (Deloitte brand) + a premium "high-end" layer (soft ambient shadows, double-bezel cards, pill CTAs, spring-curve motion). Typography is **Open Sans** (the Deloitte corporate typeface), via Google Fonts on the web and bundled TTFs in the PDF. Light theme pinned in `.streamlit/config.toml`.
 - **Tests**: pytest (`requirements-dev.txt`); includes byte-deterministic golden-file PDF tests.
 
 ## Project Purpose
@@ -46,9 +46,11 @@ talentcompass/
 │   ├── registry.py             # GLEIF LEI registry lookup for entity disambiguation
 │   ├── workforce.py            # Deterministic FTE / payroll / severance maths + rollup
 │   └── pdf/                     # PDF package (split from the old pdf_export.py monolith)
-│       ├── base.py             #   _DeloittePDF, colours, _safe, _ts, render helpers
+│       ├── base.py             #   _DeloittePDF, palette, _safe, _ts, text helpers +
+│       │                       #   visual toolkit: _kpi_tiles, _gauge, _meter,
+│       │                       #   _hbar_chart, _eyebrow, _record_title, _cover
 │       ├── sections.py         #   _write_role_section, _write_company_section
-│       └── builders.py         #   the 5 build_* functions
+│       └── builders.py         #   the 5 build_* functions (multi-record get a cover)
 │   └── pdf_export.py           # Thin re-export shim (back-compat for existing imports)
 ├── pages/
 │   ├── role_analysis.py        # Role Analysis: presets, workforce inputs, agent library, HR advisory
@@ -56,8 +58,8 @@ talentcompass/
 │   ├── org_overview.py         # Comparative charts + workforce rollup
 │   ├── agent_library_page.py   # Browse/create/edit/delete agent templates
 │   └── reports_export.py       # Session history, tabbed review, PDF downloads
-├── styles/main.css             # Deloitte brand styling
-├── assets/fonts/               # DejaVuSans.ttf, DejaVuSans-Bold.ttf for PDF
+├── styles/main.css             # Deloitte brand styling + premium high-end layer
+├── assets/fonts/               # OpenSans-Regular/Bold.ttf (PDF body); DejaVuSans*.ttf (legacy)
 ├── tests/                      # pytest suite + golden PDF checksums
 ├── requirements.txt
 └── requirements-dev.txt        # pytest
@@ -112,15 +114,19 @@ pytest -q                                  # run the test suite
 
 ## CSS & Branding
 
-- Colors: Deloitte green `#86BC25`, black `#1A1A1A`, greys. Light theme pinned in `.streamlit/config.toml`.
-- Typography: Cabinet Grotesk (Fontshare) for headings. Note `main.css` restores the Material Symbols icon font on icon elements so the `[data-baseweb] *` font override doesn't render icons as ligature text.
-- Deloitte logo: base64 data URI in sidebar; also in PDF headers.
+- **Palette**: primary Deloitte green `#86BC25`, black `#1A1A1A`, greys. Official secondary data-viz colours (shared by app charts + PDF): Green 7 `#046A38`, Blue `#0076A8`, Teal `#007680`, Cool Gray 9 `#75787B`. **No amber/teal/magenta** in any chart — it was scrubbed for brand compliance. Light theme pinned in `.streamlit/config.toml`.
+- **Typography**: **Open Sans** (Deloitte corporate typeface) everywhere — Google Fonts import in `main.css`, bundled TTFs for the PDF. Plotly `font.family` is Open Sans too. (`main.css` still restores the Material Symbols icon font on icon elements so the `[data-baseweb] *` override doesn't render icons as ligature text.)
+- **Premium layer** (`main.css` §22): soft layered ambient shadows (no harsh 1px greys), double-bezel cards (outer tray + inner core) on bordered containers / metrics / expanders, pill CTAs with spring lift + `active:scale`, custom `cubic-bezier(0.32,0.72,0,1)` motion (no `linear`/`ease-in-out`), larger tight type scale, `.tc-eyebrow` badge utility, entry fade-up, `prefers-reduced-motion` guard.
+- **White-label**: no LLM-vendor name is shown in the UI (API-key label, model selector, captions, error messages all genericised). Keep it that way for user-facing copy.
+- Deloitte logo: base64 data URI in sidebar; also in PDF headers (with the signature green dot).
 
 ## PDF Export Details
 
 - Package `services/pdf/` (`base.py`, `sections.py`, `builders.py`); `services/pdf_export.py` is a re-export shim.
-- `_safe()` normalizes Unicode for DejaVu; characters that fail UTF-8 round-trip are dropped.
-- Builders: `build_single_role_pdf`, `build_roles_pdf`, `build_single_company_pdf`, `build_companies_pdf`, `build_combined_pdf`. Role PDFs include guarded workforce + HR-advisory blocks.
+- **Font**: Open Sans (`OpenSans-Regular.ttf` / `OpenSans-Bold.ttf` in `assets/fonts/`) registered as the `"OpenSans"` family. `_safe()` normalises smart quotes/dashes to ASCII and drops characters the font can't round-trip via UTF-8; missing glyphs render as `.notdef` (no crash).
+- **Visual toolkit** (`base.py`, native fpdf vector — deterministic, no raster): `_kpi_tiles` (double-bezel metric cards), `_gauge` (donut via `solid_arc`, clockwise-from-top), `_meter` + `_hbar_chart` (brand-coloured bars, `fmt` hook for EUR), `_eyebrow` pill, `_record_title`, `_cover` (premium cover page). `_need()` guards page breaks; `header()` resets the cursor to the top margin so auto-break pages never collide with the green band.
+- **Builders**: `build_single_role_pdf`, `build_roles_pdf`, `build_single_company_pdf`, `build_companies_pdf`, `build_combined_pdf`. Multi-record exports (and the combined report) open with a cover page; single-record downloads stay compact. Role PDFs include guarded workforce + HR-advisory blocks; group blocks (task chart, workforce financials) are kept together across page breaks.
+- **Golden tests**: any visual/palette/font change alters the bytes — reseed with `UPDATE_GOLDEN=1 pytest tests/test_pdf_builders.py`, then confirm a second plain run is green (the freeze in `tests/conftest.py` keeps output deterministic).
 
 ## Known Gaps & Future Improvements
 

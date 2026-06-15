@@ -1,6 +1,6 @@
 # 🧭 TalentCompass
 
-**AI Workforce Intelligence & HR Advisory — Built for Deloitte Luxembourg**
+**AI Workforce Intelligence & HR Advisory**
 
 TalentCompass is a Streamlit app that connects to Claude to generate:
 - **Role assessments** — automation potential, task breakdown, AI agent recommendations, reskilling, roadmap, risks — driven by the actual job description you provide.

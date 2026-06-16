@@ -1,4 +1,4 @@
-"""Deterministic workforce & financial impact maths (WO-13, extended WO-15).
+"""Deterministic workforce & financial impact maths (WO-13, extended WO-16).
 
 Unlike the LLM-generated automation_score (a judgement), these figures are plain
 arithmetic on consultant-supplied headcount and fully-loaded cost. They are
@@ -31,7 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 # ── Reference standards ──────────────────────────────────────────────────────
-ANNUAL_FTE_HOURS = 1960.0  # Luxembourg standard — mandatory (WO-15)
+ANNUAL_FTE_HOURS = 1960.0  # Luxembourg standard — mandatory (WO-16)
 FULL_WEEK_HOURS = 40.0     # legacy weekly basis (1960 = 40 * 49 working weeks)
 
 # ── Automation model ─────────────────────────────────────────────────────────

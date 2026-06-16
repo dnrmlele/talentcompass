@@ -203,7 +203,7 @@ def company2(company) -> dict:
     return c
 
 
-# ── Workload-impact fixture (WO-15) ──────────────────────────────────────────────
+# ── Workload-impact fixture (WO-16) ──────────────────────────────────────────────
 # A deterministic LLM-workload rating set; compute_workforce_impact turns it into the
 # rich workforce dict the PDF renders. Used to golden the new workload PDF block while
 # keeping the basic (no-workforce) fixtures byte-identical.

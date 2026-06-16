@@ -5,6 +5,7 @@
 TalentCompass is a Streamlit app, Deloitte-branded end to end (Open Sans, brand palette, premium UI), that uses a frontier LLM (Anthropic Claude, white-labelled in the UI) to generate:
 - **Role assessments** — automation potential, task breakdown, AI agent recommendations, reskilling, roadmap, risks — driven by the actual job description you provide.
 - **Workforce & financial impact** — FTE freed, annual payroll savings, transition cost and severance exposure, computed by real arithmetic from your headcount and loaded cost (not AI estimates).
+- **Workload Impact analysis** — opt-in, adoption-aware task-level capacity model on the Luxembourg 1 FTE = 1,960 h/yr basis: per-task automation type + short-/medium-term adoption, hours and FTE saved, role classification, conservative/realistic/ambitious scenarios and Luxembourg regulatory flags. The model proposes the ratings; you override any of them and the maths recompute live.
 - **HR management & advisory** — redeployment, reskilling investment, change management, retention priorities and workforce planning, generated on demand.
 - **Client intelligence** — market-focused AI potential score, trends, competitor moves and a Deloitte engagement angle, with entity disambiguation for ambiguous company names.
 - **Organization overview** — compare all analysed roles, with an org-wide workforce/financial rollup.
@@ -27,7 +28,8 @@ talentcompass/
 │   ├── agent_library.py        # AI-agent template library
 │   ├── template_store.py       # Session/file persistence for custom templates
 │   ├── registry.py             # GLEIF registry lookup for entity disambiguation
-│   ├── workforce.py            # Deterministic FTE / payroll / severance maths
+│   ├── workforce.py            # Deterministic maths: FTE / payroll / severance +
+│   │                           #   Workload Impact engine (1,960h/yr, adoption, scenarios)
 │   └── pdf/                    # Deloitte-branded PDF package: vector charts +
 │                               #   cover page (+ pdf_export.py shim)
 ├── pages/                      # role_analysis, client_research, org_overview,
@@ -64,8 +66,9 @@ Your API key is stored only in the browser session — never on disk or a server
 2. (Optional) Open **Workforce inputs** and enter headcount + fully-loaded annual cost/FTE to unlock the financial impact figures.
 3. Click **Analyze Role**. The model returns automation score, task breakdown, AI agents, reskilling, roadmap and risks.
 4. **Workforce & Financial Impact** (FTE freed, payroll savings, net savings, severance) is computed live from your inputs.
-5. Click **Generate HR advisory** for redeployment, reskilling, change-management, retention and workforce-planning guidance.
-6. Apply curated agents from the **Agent library** expander.
+5. (Optional) Click **Run workload analysis** for the adoption-aware task-level model: hours/FTE saved short- and medium-term, %-workload impacted, role classification, scenarios and Luxembourg regulatory flags. Override any automation type, time split or adoption rating and the numbers recompute instantly — no extra API call.
+6. Click **Generate HR advisory** for redeployment, reskilling, change-management, retention and workforce-planning guidance.
+7. Apply curated agents from the **Agent library** expander.
 
 ### Client Research
 1. Enter a client name, market, and optional industry.
@@ -76,7 +79,7 @@ Your API key is stored only in the browser session — never on disk or a server
 Browse built-in templates, create/edit/delete your own, and apply them to roles. Custom templates persist for the session (or to disk — see flags below) and travel with session export.
 
 ### Organization Overview
-All analysed roles compared in charts, plus an org-wide workforce/financial rollup across roles that have headcount entered.
+All analysed roles compared in charts, plus an org-wide workforce/financial rollup across roles that have headcount entered — including an annual Workload Impact rollup (FTE saved ST/MT) for roles that have run the workload analysis.
 
 ### Reports & Export
 Download Deloitte-branded PDFs (single role/company, all, or a combined session report), and export/import your whole session as JSON. Multi-record and combined exports open with a premium cover page; every report carries native vector charts (KPI tiles, gauges, brand-coloured bar charts) — no screenshots, fully deterministic.
@@ -117,6 +120,7 @@ TC_DEV=1 streamlit run app.py    $env:TC_DEV=1; streamlit run app.py
 
 ## Notes
 - Model is selectable in the sidebar — **Fast** / **Quality** (ids `claude-haiku-4-5` / `claude-opus-4-5` live in code only; the UI is white-labelled).
-- Financial figures (FTE, payroll, severance) are deterministic arithmetic on your inputs; automation scores and advisory are AI-generated.
+- Financial figures (FTE, payroll, severance) and all Workload Impact numbers (hours, FTE, scenarios) are deterministic arithmetic on the 1 FTE = 1,960 h/yr basis; the model supplies only qualitative ratings, automation scores and advisory.
+- Luxembourg regulatory flags are conservative defaults — validate thresholds with legal counsel before relying on them.
 - API key is session-only and never stored or exported.
 - Luxembourg is the fully-supported market; Belgium is an early beta profile.

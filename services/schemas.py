@@ -183,7 +183,7 @@ class HRAdvisory(_Base):
     hr_risks: list[HRRisk] = Field(default_factory=list)
 
 
-# ── Workload Impact analysis (WO-15) ─────────────────────────────────────────────
+# ── Workload Impact analysis (WO-16) ─────────────────────────────────────────────
 # The LLM supplies ONLY qualitative judgements + labels here. The single numeric
 # field, time_allocation_pct, is a distribution judgement (flagged as a Step-0
 # assumption, consultant-overridable). All hours/FTE/% figures are computed

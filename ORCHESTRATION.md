@@ -23,6 +23,9 @@ Graph basis: `graphify-out/graph.json` (87 nodes, 161 edges, 10 communities).
 | WO-12 | Pluggable template persistence | 6 | DONE | WO-09 | services/template_store.py (new), services/agent_library.py, tests/test_template_store.py (new) |
 | WO-13 | Workforce impact (FTE/payroll/severance) | 7 | DONE | WO-02 | services/workforce.py (new), pages/role_analysis.py, pages/org_overview.py, services/pdf/sections.py, tests/test_workforce.py (new) |
 | WO-14 | HR management & advisory (LLM) | 7 | DONE | WO-02, WO-13 | services/schemas.py, services/prompts.py, services/claude_client.py, pages/role_analysis.py, services/pdf/sections.py, tests/test_hr_advisory.py (new) |
+| WO-16 | Workload Impact engine (1,960h/yr, adoption-aware, ST/MT, scenarios) | 8 | DONE | WO-13, WO-14 | services/workforce.py, services/schemas.py, services/prompts.py, services/claude_client.py, pages/role_analysis.py, pages/org_overview.py, services/pdf/sections.py, tests/test_workload.py (new), tests/conftest.py, tests/test_pdf_builders.py, tests/golden/checksums.json, CLAUDE.md, README.md |
+
+(WO-15 = out-of-band design refresh, logged in Worker notes; not a graph WO. WO-16 is the next sequential work-order number.)
 
 Status values: READY / IN PROGRESS / REVIEW / DONE / BLOCKED.
 Rule: two work orders that touch the same file never run in parallel. Waves encode this.
@@ -332,6 +335,26 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 
 **Open:** PDF emoji/non-Latin glyphs render `.notdef` under Open Sans (no crash) — DejaVu kept on disk if full-Unicode coverage is ever needed. Internal code/docstring "Claude" references left as-is (accurate; not user-facing).
 
+## WO-16 (Opus 4.8, 2026-06-16) — DONE
+
+**Objective (delivered):** Implement the user's "Workload Impact Analysis Agent" spec as an adoption-aware, auditable capacity engine that quantifies AI/automation impact in hours & FTE on the mandatory Luxembourg basis **1 FTE = 1,960 h/yr**. Unifies/extends the WO-13 workforce module rather than adding a parallel one (user decision). Core engine = spec Steps 0–7; Steps 8 (workforce-planning interface) and 9 (structured dataset tables) deferred (user decision). Ratings are **hybrid**: the LLM proposes, the consultant overrides, the maths recompute live (user decision).
+
+**Determinism boundary (the whole point):** the LLM (`analyze_workload_impact` + `WORKLOAD_SYSTEM`/`WorkloadImpact`) returns ONLY qualitative per-task ratings (automation type, time-allocation %, ST/MT adoption factors, criticality) + role-level labels/text. Every hour/FTE/EUR/% is computed in `services/workforce.py`. The schema carries no numeric impact field except `time_allocation_pct` (a Step-0 distribution judgement, flagged as an assumption). Honours the spec's "never invent data / distinguish potential vs adoption / quantify only, no workforce actions" rules.
+
+**Engine (`services/workforce.py`):** `ANNUAL_FTE_HOURS=1960`; automation bands (full/ai_led/human_led/human_only) capped by a tunable `OVERSIGHT_FLOOR=0.15`; `_adoption_rate` = min of four favourability-framed factors × scenario multiplier; ST/MT hours & FTE saved; %-impacted; role classification (release-risk >80 / reduction 30–80 / augmentation <30) + min-viable-role redesign flag; `build_scenarios` (conservative ≤ realistic ≤ ambitious by construction); ±5% allocation reconciliation; `regulatory_flags` (LU defaults — staff-delegation, collective-redundancy ≥7/30d & ≥15/90d, high-transformation; conditional wording since the engine doesn't recommend actions); by-process/by-function rollup; `rollup_workforce` extended with workload keys. **Basic path (no `llm_workload`) returns the original 12-key dict byte-identically** → existing WO-13 behaviour and goldens untouched.
+
+**Surfaced:** Role Analysis (opt-in "Run workload analysis" → override widgets for type/alloc/adoption + scenario/horizon, instant deterministic recompute, dashboard, task table, scenarios, reg flags, exec summary, completeness gate); Organization Overview (workload rollup); role PDF (`sections.py` guarded block — tiles, per-task bars, scenario bars, classification, flags, exec summary).
+
+**Reconciliation note (1,960 = 40h × 49 weeks):** the WO-13 weekly `fte_freed = weekly_hours×headcount/40` equals annualised `hours_saved/1960`, so the new annual model stays consistent with the existing per-role FTE numbers — which is why the basic-path dict and its goldens stay byte-identical.
+
+**Verification:** 83/83 pytest (+21 engine/schema/prompt/client-mocked tests + 1 new workload PDF golden). Existing 5 golden hashes **byte-identical** (confirmed via git diff — only `build_single_role_pdf_workload` added). Pages import-checked; engine smoke-tested. LLM-dependent UI path needs a live key — flagged for the user's manual run.
+
+**Deviations / open:**
+- D14: code originally tagged this work "WO-15" in comments, which collided with the existing WO-15 design-refresh entry; renumbered to **WO-16** across `workforce.py`/`schemas.py`/`conftest.py`/`test_workload.py` and this log.
+- D15 (partial-by-design, core-first): spec 2.3 double-run/ramp is approximated by the scenario adoption multiplier (no explicit parallel-run schedule); 2.5 cross-role secondary impacts and Step-4 by-process/by-function are **computed in the data** but not yet charted in the UI.
+- D16: oversight floor caps full automation at 85% (the conservative reading of the spec's "minimum human oversight floor 10–20%"); tunable to 0. LU regulatory thresholds are defaults — flagged in-code + in docs as needing legal sign-off.
+- No new runtime dependency (uses streamlit/anthropic/plotly/pandas/fpdf2/pydantic already pinned); `requirements*.txt` unchanged.
+
 ## Coordinator log
 
 - 2026-06-12: Plan created. Wave 1 (WO-01, WO-04) released.
@@ -357,3 +380,4 @@ Rule: two work orders that touch the same file never run in parallel. Waves enco
 - 2026-06-13: graphify . --update run after WO-13 role slice — 34 changed files (30 code + 4 docs, 1 semantic subagent). Graph 87→347 nodes, 690 edges, 17 communities. New god nodes surfaced: _Base, get_store, compute_workforce_impact, ClaudeClientError. Outputs (graph.html/json, GRAPH_REPORT.md) refreshed; ~50k tokens incremental.
 - 2026-06-13: WO-13 + WO-14 DONE. Workforce maths (deterministic FTE/payroll/severance + org rollup) and HR advisory (LLM, opt-in). 61/61 pytest; goldens green (guarded PDF blocks); byte-identity preserved. 15 work orders DONE total. Uncommitted since the v2 commit — WO-13/14 + graphify-out refresh not yet committed.
 - 2026-06-15/16: WO-15 DONE (design refresh, out-of-band). Fixed PDF text overflow (justified→left) + a latent auto-page-break/header collision; added a deterministic native vector chart toolkit (KPI tiles, donut gauge, bar charts) + cover page; swapped typography to Open Sans (Deloitte font) app + PDF; scrubbed all off-brand chart colours to the Deloitte secondary palette; added a premium high-end CSS layer; white-labelled the UI (no LLM vendor named). 61/61 pytest; goldens reseeded + deterministic; PDFs and landing visually verified. Docs (CLAUDE.md, README.md, this file) updated. Still uncommitted.
+- 2026-06-16: WO-16 DONE (Workload Impact engine — the user's "Workload Impact Analysis Agent" spec, Steps 0–7). Unified onto WO-13's workforce.py; 1,960 h/yr annual model, adoption-aware (adoption = min of factors), ST/MT, scenarios, classification, LU regulatory flags; hybrid LLM-proposes/consultant-overrides with live deterministic recompute. Determinism boundary enforced at the schema (no numeric impact fields). 83/83 pytest; existing 5 PDF goldens byte-identical (only the new workload golden added). Committed to talentcompass-v3 (cafc931, feature) — this docs/requirements pass + WO-15→WO-16 renumber committed on top. Steps 8–9 deferred. Branch pushed to origin.

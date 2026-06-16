@@ -1,4 +1,4 @@
-"""Tests for the Workload Impact engine, schema, prompt and client (WO-15).
+"""Tests for the Workload Impact engine, schema, prompt and client (WO-16).
 
 These lock the deterministic maths (the defensible, auditable layer) and the
 determinism boundary: with no llm_workload the output is byte-identical to the

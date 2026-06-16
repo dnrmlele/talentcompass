@@ -30,6 +30,7 @@ from services.pdf.base import (
     DTT_DARKGREEN,
     DTT_SLATE,
 )
+from services.workforce import CLASSIFICATION_LABELS
 
 
 def _eur(v: Any) -> str:
@@ -152,6 +153,72 @@ def _write_role_section(pdf: FPDF, r: dict[str, Any], index: int | None = None) 
             ],
             fmt=_eur,
         )
+
+        # Workload Impact engine output (annual, adoption-aware) — only present
+        # when a workload analysis was run, so basic-workforce records are
+        # byte-identical to before this block existed.
+        if wf.get("hours_saved_mt") is not None:
+            _need(pdf, 60)
+            _subh(pdf, "Workload impact (annual basis, 1 FTE = 1,960 h/yr)")
+            _kpi_tiles(
+                pdf,
+                [
+                    (f"{wf.get('hours_saved_mt', 0):,.0f} h", "Hours saved / yr (MT)"),
+                    (f"{wf.get('fte_saved_mt', 0)}", "FTE saved (MT)"),
+                    (f"{wf.get('pct_workload_impacted_mt', 0):.0f}%", "Workload impacted"),
+                ],
+            )
+            pdf.ln(1)
+            wtasks = wf.get("tasks") or []
+            if wtasks:
+                _need(pdf, min(150, 14 + min(len(wtasks), 14) * 10.8))
+                _subh(pdf, "Hours saved per task (medium term)")
+                _hbar_chart(
+                    pdf,
+                    [
+                        (
+                            f"{t.get('name', '')}  ({t.get('automation_type_label', '')})",
+                            t.get("hours_saved_mt", 0) or 0,
+                            _cat_color(t.get("automation_type_label", "")),
+                        )
+                        for t in wtasks[:14]
+                    ],
+                    unit=" h",
+                )
+            scn = wf.get("scenarios") or {}
+            if scn:
+                _need(pdf, 32)
+                _subh(pdf, "Scenarios -- FTE saved (medium term)")
+                _hbar_chart(
+                    pdf,
+                    [
+                        ("Conservative", scn.get("conservative", {}).get("fte_saved_mt", 0) or 0, DTT_SLATE),
+                        ("Realistic", scn.get("realistic", {}).get("fte_saved_mt", 0) or 0, DTT_BLUE),
+                        ("Ambitious", scn.get("ambitious", {}).get("fte_saved_mt", 0) or 0, DTT_GREEN),
+                    ],
+                    unit=" FTE",
+                )
+            cls = wf.get("classification", "")
+            bits = [f"Classification: {CLASSIFICATION_LABELS.get(cls, cls)}"]
+            if wf.get("strategic_value"):
+                bits.append(f"Strategic value: {wf['strategic_value']}")
+            if wf.get("confidence"):
+                bits.append(f"Confidence: {wf['confidence']}")
+            if wf.get("redesign_flag"):
+                bits.append("Residual < 0.5 FTE/incumbent -- redesign")
+            _body(pdf, "  |  ".join(bits), 9)
+            if wf.get("regulatory_flags"):
+                _body(pdf, "Regulatory flags:", 9)
+                _bullets(pdf, [str(f) for f in wf["regulatory_flags"]])
+            if wf.get("exec_summary"):
+                _body(pdf, "Executive summary (capacity):", 9)
+                _bullets(pdf, [str(b) for b in wf["exec_summary"][:5]])
+            if wf.get("no_regret_moves"):
+                _body(pdf, "No-regret moves (0-6 months):", 9)
+                _bullets(pdf, [str(b) for b in wf["no_regret_moves"]])
+            if wf.get("assumptions"):
+                _body(pdf, "Assumptions:", 9)
+                _bullets(pdf, [str(a) for a in wf["assumptions"]])
 
     adv = r.get("hr_advisory")
     if adv:

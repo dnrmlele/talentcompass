@@ -181,3 +181,41 @@ class HRAdvisory(_Base):
     retention_priorities: list[RetentionPriority] = Field(default_factory=list)
     workforce_planning: list[str] = Field(default_factory=list)
     hr_risks: list[HRRisk] = Field(default_factory=list)
+
+
+# ── Workload Impact analysis (WO-15) ─────────────────────────────────────────────
+# The LLM supplies ONLY qualitative judgements + labels here. The single numeric
+# field, time_allocation_pct, is a distribution judgement (flagged as a Step-0
+# assumption, consultant-overridable). All hours/FTE/% figures are computed
+# deterministically in services/workforce.py — never by the model.
+class AdoptionFactors(_Base):
+    # Each rated High | Medium | Low, framed so HIGH = most favourable to adoption.
+    tech_readiness: Optional[str] = None
+    change_readiness: Optional[str] = None       # spec "change complexity" (inverted)
+    data_readiness: Optional[str] = None
+    regulatory_clearance: Optional[str] = None   # spec "regulatory constraints" (inverted)
+
+
+class WorkloadTask(_Base):
+    name: Optional[str] = None
+    process: Optional[str] = None
+    automation_type: Optional[str] = None  # full | ai_led | human_led | human_only
+    time_allocation_pct: Optional[float] = None  # share of role hours (sum ~ 100)
+    adoption_st: AdoptionFactors = Field(default_factory=AdoptionFactors)
+    adoption_mt: AdoptionFactors = Field(default_factory=AdoptionFactors)
+    criticality: Optional[str] = None  # Core | Enabling | Non-core
+    residual_nature: Optional[str] = None
+    secondary_impacts: list[str] = Field(default_factory=list)
+    confidence: Optional[str] = None  # High | Medium | Low
+
+
+class WorkloadImpact(_Base):
+    # All-optional (best-effort): an empty/partial response still yields a usable,
+    # if low-confidence, computation. No hour/FTE/EUR fields by design.
+    tasks: list[WorkloadTask] = Field(default_factory=list)
+    strategic_value: Optional[str] = None  # Strategic | Core operational | Support | At-risk
+    confidence: Optional[str] = None  # overall-model confidence
+    assumptions: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    exec_summary: list[str] = Field(default_factory=list)  # <=5 COMEX bullets
+    no_regret_moves: list[str] = Field(default_factory=list)  # 0-6 month capacity moves

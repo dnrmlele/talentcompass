@@ -43,6 +43,21 @@ def render():
             f"displaced (fully-automatable) {total['displaced_fte']:.1f} FTE  ·  "
             f"transition cost {_eur(total['transition_cost'])}"
         )
+
+        if total.get("roles_with_workload"):
+            st.markdown("#### Workload Impact rollup (annual, adoption-aware)")
+            st.caption(
+                f"Across the {total['roles_with_workload']} role(s) with a workload "
+                "analysis. Annual 1 FTE = 1,960 h/yr basis, realistic scenario unless "
+                "changed per role."
+            )
+            wcol = st.columns(4)
+            wcol[0].metric("FTE saved (ST)", f"{total['fte_saved_st']:.1f}")
+            wcol[1].metric("FTE saved (MT)", f"{total['fte_saved_mt']:.1f}")
+            wcol[2].metric("Hours saved / yr (MT)", f"{total['hours_saved_mt']:,.0f}")
+            wcol[3].metric(
+                "Payroll savings (MT)", _eur(total["annual_payroll_savings_mt"])
+            )
         st.divider()
 
     # --- Summary table ---

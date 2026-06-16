@@ -5,11 +5,22 @@ import pandas as pd
 from services.claude_client import (
     analyze_role,
     analyze_hr_advisory,
+    analyze_workload_impact,
     ClaudeClientError,
 )
 from services.company_context import SIZE_OPTIONS
 from services import agent_library
-from services.workforce import compute_workforce_impact
+from services.workforce import (
+    compute_workforce_impact,
+    AUTOMATION_TYPE_LABELS,
+    ADOPTION_FACTORS,
+    ADOPTION_FACTOR_LABELS,
+    RATING_OPTIONS,
+    SCENARIO_NAMES,
+    CLASSIFICATION_LABELS,
+)
+
+_LABEL_TO_TYPE = {v: k for k, v in AUTOMATION_TYPE_LABELS.items()}
 
 _ERROR_MESSAGES = {
     "auth": "Invalid API key. Check the key in the sidebar and try again.",
@@ -98,19 +109,79 @@ def _apply_role_preset() -> None:
     st.session_state["rj_desc"] = p["desc"]
 
 
+def _collect_workload_overrides(n_tasks: int) -> dict:
+    """Read the per-task override widgets (wl_*) into an overrides dict for the
+    deterministic engine. Absent widgets fall back to the stored LLM ratings."""
+    overrides: dict[int, dict] = {}
+    for i in range(n_tasks):
+        ov: dict = {}
+        label = st.session_state.get(f"wl_type_{i}")
+        if label in _LABEL_TO_TYPE:
+            ov["automation_type"] = _LABEL_TO_TYPE[label]
+        alloc = st.session_state.get(f"wl_alloc_{i}")
+        if alloc is not None:
+            ov["time_allocation_pct"] = alloc
+        st_f = {
+            f: st.session_state.get(f"wl_st_{f}_{i}")
+            for f in ADOPTION_FACTORS
+            if st.session_state.get(f"wl_st_{f}_{i}")
+        }
+        mt_f = {
+            f: st.session_state.get(f"wl_mt_{f}_{i}")
+            for f in ADOPTION_FACTORS
+            if st.session_state.get(f"wl_mt_{f}_{i}")
+        }
+        if st_f:
+            ov["adoption_st"] = st_f
+        if mt_f:
+            ov["adoption_mt"] = mt_f
+        overrides[i] = ov
+    return overrides
+
+
+def _seed_workload_widgets(llm: dict) -> None:
+    """Prefill the override widgets from the LLM's proposed ratings (first run)."""
+    from services.workforce import _norm_type, _norm_rating  # local: internal helpers
+
+    for i, t in enumerate(llm.get("tasks") or []):
+        st.session_state[f"wl_type_{i}"] = AUTOMATION_TYPE_LABELS[
+            _norm_type(t.get("automation_type"))
+        ]
+        alloc = t.get("time_allocation_pct")
+        st.session_state[f"wl_alloc_{i}"] = float(alloc) if alloc is not None else 0.0
+        for horizon in ("st", "mt"):
+            factors = t.get(f"adoption_{horizon}") or {}
+            for f in ADOPTION_FACTORS:
+                st.session_state[f"wl_{horizon}_{f}_{i}"] = _norm_rating(factors.get(f))
+    st.session_state.setdefault("wl_scenario", "realistic")
+    st.session_state.setdefault("wl_horizon", "Medium term (~3y)")
+
+
 def _attach_workforce(role: dict) -> None:
     """Compute and attach deterministic workforce impact from the current inputs.
-    No-op (and clears any stale value) when headcount is 0."""
+    No-op (and clears any stale value) when headcount is 0. When the role carries
+    LLM workload ratings (_workload_llm), the annual Workload Impact engine runs on
+    top, using the current override widgets + scenario."""
     headcount = st.session_state.get("wf_headcount", 0) or 0
     if not headcount:
         role.pop("workforce", None)
         return
+    llm = role.get("_workload_llm")
+    overrides = None
+    scenario = "realistic"
+    if llm:
+        overrides = _collect_workload_overrides(len(llm.get("tasks") or []))
+        scenario = st.session_state.get("wl_scenario", "realistic")
     role["workforce"] = compute_workforce_impact(
         role,
         headcount=headcount,
         loaded_cost=st.session_state.get("wf_cost", 0),
         reskill_cost_per_fte=st.session_state.get("wf_reskill", 0),
         severance_months=st.session_state.get("wf_sev", 3.0),
+        llm_workload=llm,
+        overrides=overrides,
+        scenario=scenario,
+        market=st.session_state.get("market", "Luxembourg"),
     )
 
 
@@ -142,6 +213,181 @@ def _init_role_inputs() -> None:
     if "role_company_size" not in st.session_state:
         init = st.session_state.get("researched_company_size_bucket", "SME")
         st.session_state["role_company_size"] = init if init in SIZE_OPTIONS else "SME"
+
+
+def _render_workload(r: dict, wf: dict) -> None:
+    """Workload Impact Analysis sub-section: opt-in LLM ratings + deterministic
+    annual (1,960 h/yr) FTE impact, ST/MT scenarios, classification, reg flags."""
+    st.markdown("#### Workload Impact Analysis")
+    llm = r.get("_workload_llm")
+
+    if not llm:
+        if not r.get("tasks"):
+            st.info(
+                "Workload impact needs a task breakdown. Re-run the role analysis "
+                "with a detailed job description first."
+            )
+            return
+        st.caption(
+            "Adoption-aware, task-level FTE impact on the Luxembourg 1 FTE = 1,960 h/yr "
+            "basis, with short-/medium-term scenarios. The model proposes automation types "
+            "and adoption ratings; you can override every assumption. One extra API call."
+        )
+        if st.button("Run workload analysis", key="gen_workload"):
+            api_key = st.session_state.get("api_key", "")
+            if not api_key:
+                st.error("Enter your API key in the sidebar first.")
+                return
+            with st.spinner("Rating workload automation profile..."):
+                try:
+                    res = analyze_workload_impact(
+                        api_key, r, st.session_state.get("market", "Luxembourg")
+                    )
+                    r["_workload_llm"] = res
+                    _seed_workload_widgets(res)
+                    st.rerun()
+                except ClaudeClientError as e:
+                    st.error(_ERROR_MESSAGES.get(e.kind, _ERROR_MESSAGES["api"]))
+        return
+
+    # Lazily seed override widgets (e.g. after a session import re-attaches _workload_llm).
+    if "wl_type_0" not in st.session_state and (llm.get("tasks")):
+        _seed_workload_widgets(llm)
+
+    # ── Controls: scenario, horizon, re-run ───────────────────────────────────
+    cc1, cc2, cc3 = st.columns([1, 1.4, 1])
+    cc1.selectbox(
+        "Scenario", list(SCENARIO_NAMES), key="wl_scenario", format_func=str.capitalize
+    )
+    cc2.radio(
+        "Horizon",
+        ["Short term (today)", "Medium term (~3y)"],
+        key="wl_horizon",
+        horizontal=True,
+    )
+    with cc3:
+        st.write("")
+        if st.button("Re-run ratings", key="regen_workload", help="Discard overrides and ask again."):
+            for k in [k for k in st.session_state if k.startswith("wl_")]:
+                st.session_state.pop(k, None)
+            r.pop("_workload_llm", None)
+            r.pop("workforce", None)
+            st.rerun()
+
+    horizon = "st" if str(st.session_state.get("wl_horizon", "")).startswith("Short") else "mt"
+
+    # ── Dashboard KPIs (selected horizon) ─────────────────────────────────────
+    cls = wf.get("classification", "")
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric(f"Hours saved / yr ({horizon.upper()})", f"{wf.get(f'hours_saved_{horizon}', 0):,.0f}")
+    d2.metric(f"FTE saved ({horizon.upper()})", f"{wf.get(f'fte_saved_{horizon}', 0):.2f}")
+    d3.metric("Workload impacted", f"{wf.get(f'pct_workload_impacted_{horizon}', 0):.0f}%")
+    d4.metric("Annual payroll savings (MT)", _eur(wf.get("annual_payroll_savings_mt", 0)))
+    redesign = "  ·  ⚠ residual < 0.5 FTE/incumbent — flag for redesign" if wf.get("redesign_flag") else ""
+    st.caption(
+        f"Baseline {wf.get('total_annual_hours', 0):,.0f} h/yr "
+        f"({wf.get('headcount', 0)} FTE × 1,960 h)  ·  classification: "
+        f"**{CLASSIFICATION_LABELS.get(cls, cls)}**{redesign}"
+    )
+
+    rec = wf.get("reconciliation") or {}
+    if rec and not rec.get("reconciled", True):
+        st.warning(
+            f"Task time allocation sums to {rec.get('allocation_sum_pct', 0):.0f}% "
+            f"(variance {rec.get('variance_pct', 0):+.0f}%, tolerance ±5%). Adjust the "
+            "Time % values below so they total ~100% for a clean reconciliation."
+        )
+    for flag in wf.get("regulatory_flags", []):
+        st.warning(f"⚖ {flag}")
+
+    # ── Task table ────────────────────────────────────────────────────────────
+    rows = wf.get("tasks", [])
+    if rows:
+        df = pd.DataFrame(
+            [
+                {
+                    "Task": t["name"],
+                    "Type": t["automation_type_label"],
+                    "Criticality": t.get("criticality", ""),
+                    "Time %": t["time_allocation_pct"],
+                    "Hrs/yr": t["task_hours"],
+                    "Saved ST": t["hours_saved_st"],
+                    "Saved MT": t["hours_saved_mt"],
+                    "Residual MT": t["residual_hours_mt"],
+                }
+                for t in rows
+            ]
+        )
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # ── Scenario comparison (MT) ──────────────────────────────────────────────
+    scn = wf.get("scenarios") or {}
+    if scn:
+        scols = st.columns(3)
+        for col, name in zip(scols, SCENARIO_NAMES):
+            d = scn.get(name, {})
+            col.metric(
+                name.capitalize(),
+                f"{d.get('fte_saved_mt', 0):.2f} FTE",
+                help=f"MT hours saved: {d.get('hours_saved_mt', 0):,.0f}",
+            )
+        st.caption("FTE saved by scenario (medium term) — varies adoption + transition speed.")
+
+    # ── Exec summary / no-regret moves ────────────────────────────────────────
+    if wf.get("exec_summary"):
+        st.markdown("**Executive summary (capacity)**")
+        for b in wf["exec_summary"][:5]:
+            st.markdown(f"- {b}")
+    if wf.get("no_regret_moves"):
+        st.markdown("**No-regret moves (0–6 months)**")
+        for b in wf["no_regret_moves"]:
+            st.markdown(f"- {b}")
+
+    meta = []
+    if wf.get("strategic_value"):
+        meta.append(f"Strategic value: **{wf['strategic_value']}**")
+    if wf.get("confidence"):
+        meta.append(f"Model confidence: **{wf['confidence']}**")
+    if meta:
+        st.caption("  ·  ".join(meta))
+    if wf.get("assumptions") or wf.get("gaps"):
+        with st.expander("Assumptions & data gaps"):
+            if wf.get("assumptions"):
+                st.markdown("**Assumptions**")
+                for a in wf["assumptions"]:
+                    st.markdown(f"- {a}")
+            if wf.get("gaps"):
+                st.markdown("**Gaps**")
+                for g in wf["gaps"]:
+                    st.markdown(f"- {g}")
+
+    # ── Override controls (instant recompute, no API call) ────────────────────
+    with st.expander("Override assumptions (recompute is instant — no API call)"):
+        st.caption(
+            "Adjust automation type, time split and adoption ratings. Adoption ratings are "
+            "framed so **High = most favourable** to adoption (e.g. Regulatory clearance "
+            "High = few blockers). Numbers update on change."
+        )
+        for i, t in enumerate(rows):
+            with st.container(border=True):
+                st.markdown(f"**{t['name']}**")
+                oc1, oc2 = st.columns([2, 1])
+                oc1.selectbox(
+                    "Automation type", list(AUTOMATION_TYPE_LABELS.values()), key=f"wl_type_{i}"
+                )
+                oc2.number_input(
+                    "Time %", min_value=0.0, max_value=100.0, step=1.0, key=f"wl_alloc_{i}"
+                )
+                st.caption("Adoption — short term (today)")
+                for col, f in zip(st.columns(len(ADOPTION_FACTORS)), ADOPTION_FACTORS):
+                    col.selectbox(
+                        ADOPTION_FACTOR_LABELS[f], list(RATING_OPTIONS), key=f"wl_st_{f}_{i}"
+                    )
+                st.caption("Adoption — medium term (~3y)")
+                for col, f in zip(st.columns(len(ADOPTION_FACTORS)), ADOPTION_FACTORS):
+                    col.selectbox(
+                        ADOPTION_FACTOR_LABELS[f], list(RATING_OPTIONS), key=f"wl_mt_{f}_{i}"
+                    )
 
 
 def render():
@@ -342,6 +588,7 @@ def render():
             f"(reskill {_eur(wf['reskill_cost_per_fte'])}/FTE)  ·  "
             f"severance basis {wf['severance_months']:.0f} months"
         )
+        _render_workload(r, wf)
     else:
         st.caption(
             "Add a headcount in **Workforce inputs** above to see FTE, payroll and severance impact."

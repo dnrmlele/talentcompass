@@ -11,12 +11,15 @@ from services.prompts import (
     disambiguation_prompt,
     HR_ADVISORY_SYSTEM,
     hr_advisory_prompt,
+    WORKLOAD_SYSTEM,
+    workload_prompt,
 )
 from services.schemas import (
     RoleAnalysis,
     CompanyResearch,
     CompanyCandidates,
     HRAdvisory,
+    WorkloadImpact,
 )
 
 _RETRY_INSTRUCTION = (
@@ -190,4 +193,18 @@ def analyze_hr_advisory(api_key, role, workforce=None) -> dict:
     prompt = hr_advisory_prompt(role, workforce)
     return _validate(
         _call(api_key, HR_ADVISORY_SYSTEM, prompt, max_tokens=2500), HRAdvisory
+    )
+
+
+def analyze_workload_impact(api_key, role, market=None) -> dict:
+    """Rate the workload-automation profile of a completed role analysis.
+
+    Returns qualitative per-task ratings (automation type, time allocation, ST/MT
+    adoption factors, criticality) plus role-level labels. All numeric impact —
+    hours, FTE, scenarios — is computed deterministically in services/workforce.py
+    from these ratings; the model supplies judgement only.
+    """
+    prompt = workload_prompt(role, market)
+    return _validate(
+        _call(api_key, WORKLOAD_SYSTEM, prompt, max_tokens=3500), WorkloadImpact
     )

@@ -38,6 +38,13 @@ def test_build_roles_pdf(role, role2):
     _check_or_update("build_roles_pdf", data)
 
 
+def test_build_single_role_pdf_workload(role_workload):
+    # Exercises the Workload Impact PDF block (annual basis, scenarios, flags).
+    data = build_single_role_pdf(role_workload)
+    _assert_pdf(data)
+    _check_or_update("build_single_role_pdf_workload", data)
+
+
 def test_build_single_company_pdf(company):
     data = build_single_company_pdf(company)
     _assert_pdf(data)

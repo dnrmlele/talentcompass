@@ -201,3 +201,77 @@ def company2(company) -> dict:
     prof["name"] = "Euroclear"
     c["company_profile"] = prof
     return c
+
+
+# ── Workload-impact fixture (WO-15) ──────────────────────────────────────────────
+# A deterministic LLM-workload rating set; compute_workforce_impact turns it into the
+# rich workforce dict the PDF renders. Used to golden the new workload PDF block while
+# keeping the basic (no-workforce) fixtures byte-identical.
+_LLM_WORKLOAD = {
+    "tasks": [
+        {
+            "name": "NAV reconciliation",
+            "process": "Fund accounting",
+            "automation_type": "ai_led",
+            "time_allocation_pct": 60,
+            "adoption_st": {
+                "tech_readiness": "Medium",
+                "change_readiness": "Medium",
+                "data_readiness": "High",
+                "regulatory_clearance": "Medium",
+            },
+            "adoption_mt": {
+                "tech_readiness": "High",
+                "change_readiness": "High",
+                "data_readiness": "High",
+                "regulatory_clearance": "Medium",
+            },
+            "criticality": "Core",
+            "residual_nature": "Exception handling and sign-off.",
+            "secondary_impacts": ["Senior review load shifts."],
+            "confidence": "Medium",
+        },
+        {
+            "name": "Investor relations",
+            "process": "Client service",
+            "automation_type": "human_only",
+            "time_allocation_pct": 40,
+            "adoption_st": {
+                "tech_readiness": "Low",
+                "change_readiness": "Low",
+                "data_readiness": "Low",
+                "regulatory_clearance": "Low",
+            },
+            "adoption_mt": {
+                "tech_readiness": "Low",
+                "change_readiness": "Low",
+                "data_readiness": "Low",
+                "regulatory_clearance": "Low",
+            },
+            "criticality": "Core",
+            "confidence": "High",
+        },
+    ],
+    "strategic_value": "Core operational",
+    "confidence": "Medium",
+    "assumptions": ["Time split estimated from the task list — no time-tracking data."],
+    "gaps": ["Actual logged hours per task."],
+    "exec_summary": ["AI-led reconciliation frees medium-term capacity in fund accounting."],
+    "no_regret_moves": ["Pilot a reconciliation agent on one fund range."],
+}
+
+
+@pytest.fixture
+def role_workload(role) -> dict:
+    from services.workforce import compute_workforce_impact
+
+    r = dict(role)
+    r["workforce"] = compute_workforce_impact(
+        r,
+        headcount=20,
+        loaded_cost=80000,
+        llm_workload=_LLM_WORKLOAD,
+        scenario="realistic",
+        market="Luxembourg",
+    )
+    return r

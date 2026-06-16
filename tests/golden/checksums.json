@@ -3,5 +3,6 @@
   "build_companies_pdf": "b2c867d195a817c8b97ce90fe8558f2dd942f2322d631a0cde17988820064126",
   "build_roles_pdf": "f4e8db72cfa759601f144820b75e59b470ccee7a13af9293a561629c76debd9c",
   "build_single_company_pdf": "8265742d448098fe2d79318f6f4c07be74c15e890254f1a3c54f7d7c051df8c8",
-  "build_single_role_pdf": "24d1366b2b22c7d75526471ee0595d1f71fab0177f334c3d141096f56a7c401c"
+  "build_single_role_pdf": "24d1366b2b22c7d75526471ee0595d1f71fab0177f334c3d141096f56a7c401c",
+  "build_single_role_pdf_workload": "44f021bc01d0af76f2da022d84aaaf9b9552ab7a51a50fc775a70893366e99f9"
 }

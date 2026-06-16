@@ -35,7 +35,7 @@ talentcompass/
 ├── .streamlit/config.toml      # Pinned light theme + Deloitte palette
 ├── services/
 │   ├── claude_client.py        # API wrapper: analyze_role, research_company,
-│   │                           #   disambiguate_company, analyze_hr_advisory;
+│   │                           #   disambiguate_company, analyze_hr_advisory, analyze_workload_impact;
 │   │                           #   ClaudeClientError, _call/_send/_parse, _validate, model config
 │   ├── prompts.py              # System prompts + builders; MARKETS dict (Luxembourg/Belgium)
 │   ├── schemas.py              # pydantic v2 models for every Claude response
@@ -44,7 +44,9 @@ talentcompass/
 │   ├── agent_library.py        # AI-agent template library (builtin + custom)
 │   ├── template_store.py       # Pluggable persistence: SessionStore | FileStore (DB-ready seam)
 │   ├── registry.py             # GLEIF LEI registry lookup for entity disambiguation
-│   ├── workforce.py            # Deterministic FTE / payroll / severance maths + rollup
+│   ├── workforce.py            # Deterministic maths: basic FTE/payroll/severance (weekly) +
+│   │                           #   Workload Impact engine (annual 1,960h/yr, adoption-aware,
+│   │                           #   ST/MT, scenarios, classification, LU regulatory flags) + rollup
 │   └── pdf/                     # PDF package (split from the old pdf_export.py monolith)
 │       ├── base.py             #   _DeloittePDF, palette, _safe, _ts, text helpers +
 │       │                       #   visual toolkit: _kpi_tiles, _gauge, _meter,
@@ -73,7 +75,9 @@ talentcompass/
 
 **Schema Validation** (`services/schemas.py`): `_validate(data, Model)` runs `Model.model_validate(...).model_dump()` after parsing; a `ValidationError` raises `ClaudeClientError(kind="bad_json")` directly (NOT routed through the JSON retry — it is valid JSON of the wrong shape). All models use `extra="allow"` so unknown keys survive and `_title`/`_dept`/`_client` tags round-trip.
 
-**Deterministic vs LLM split**: `services/workforce.py` computes FTE/payroll/severance with plain arithmetic on consultant inputs — defensible and reproducible. The LLM only supplies qualitative content (automation_score, advisory). Keep this separation: never present a computed figure as an LLM guess or vice versa.
+**Deterministic vs LLM split**: `services/workforce.py` computes FTE/payroll/severance with plain arithmetic on consultant inputs — defensible and reproducible. The LLM only supplies qualitative content (automation_score, advisory, workload ratings). Keep this separation: never present a computed figure as an LLM guess or vice versa.
+
+**Workload Impact engine** (`services/workforce.py`, opt-in on top of the basic figures): `analyze_workload_impact` (prompt `WORKLOAD_SYSTEM` + schema `WorkloadImpact`) has the LLM rate, per task, an automation type + time allocation + ST/MT adoption factors (High/Med/Low, framed so High = favourable so adoption = `min(factors)`); the consultant overrides any rating in the UI. `compute_workforce_impact(..., llm_workload=...)` then computes everything numeric deterministically on the mandatory **1 FTE = 1,960 h/yr** basis (1,960 = 40h × 49 weeks, so the basic per-role FTE numbers stay consistent): task hours, hours/FTE saved ST & MT (`hours_saved = task_hours × automation_rate × adoption_rate`, automation capped by a tunable `OVERSIGHT_FLOOR`), %-impacted, role classification (release-risk/reduction/augmentation), conservative/realistic/ambitious scenarios, ±5% allocation reconciliation, and Luxembourg regulatory flags (thresholds are defaults — validate with legal). The engine quantifies capacity only; it never recommends workforce actions (that stays in HR advisory). Basic path (no `llm_workload`) returns the original 12-key dict byte-identically.
 
 **Pluggable persistence** (`services/template_store.py`): `get_store(state)` returns `SessionStore` (default) or `FileStore` (env `TC_TEMPLATE_STORE=file`). `agent_library` reads/writes only through this interface — a future `DBStore` slots in without UI changes.
 

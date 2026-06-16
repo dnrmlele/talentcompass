@@ -186,6 +186,82 @@ Rules:
     )
 
 
+WORKLOAD_SYSTEM = """You are a specialist workload and capacity analysis consultant.
+You quantify how AI and automation shift task-level workload and FTE capacity, using a
+granular, adoption-aware, bottom-up method (Task -> Role -> Process -> Function).
+
+Hard rules:
+- You QUANTIFY CAPACITY ONLY. You never recommend workforce actions (no layoffs, no hiring).
+- You return qualitative judgements and labels ONLY. You do NOT compute hours, FTE, costs,
+  savings or percentages — those are calculated downstream from your ratings. The only number
+  you provide is each task's share of role time (time_allocation_pct).
+- Never invent data. Where you must assume, say so in "assumptions".
+- Distinguish theoretical automation potential from realistic adoption.
+You always respond with valid, parseable JSON only - no markdown, no prose, no explanation. Raw JSON only."""
+
+
+def workload_prompt(role, market=None):
+    """Build a workload-impact rating prompt from a completed role analysis.
+
+    Asks for per-task automation type, time allocation and adoption-factor ratings
+    (the qualitative inputs); all numeric impact is computed in services/workforce.py.
+    """
+    m = MARKETS[_resolve_market(market)]
+    label = m["label"]
+    stats = role.get("stats") or {}
+    tasks = role.get("tasks") or []
+    task_lines = (
+        "\n".join(f"- {t.get('name', '')} ({t.get('type', '')})" for t in tasks)
+        or "- (no task list provided — infer the main tasks from the role)"
+    )
+    return f"""Rate the workload-automation profile of this role for a {label} employer.
+Use the role's existing task list. For each task give an automation TYPE, its share of the
+role's working time, and adoption-factor ratings for the short term (ST, today) and medium
+term (MT, ~3 years). Provide qualitative labels only — do NOT estimate hours, FTE or money.
+
+Role: {role.get('_title', '')}
+Department: {role.get('_dept', '')}
+Automation score (context): {role.get('automation_score', 0)}%
+Task mix (context): {stats.get('fully_automatable_pct', 0)}% fully automatable, """ + f"""{stats.get('ai_augmented_pct', 0)}% AI-augmented, {stats.get('human_only_pct', 0)}% human-only.
+
+Tasks:
+{task_lines}
+
+Return a JSON object with exactly this structure:
+{{
+  "tasks": [
+    {{
+      "name": "<task name, matching the list above where possible>",
+      "process": "<the business process this task belongs to>",
+      "automation_type": "<full|ai_led|human_led|human_only>",
+      "time_allocation_pct": <number; share of the role's working time; all tasks sum to ~100>,
+      "adoption_st": {{"tech_readiness": "<High|Medium|Low>", "change_readiness": "<High|Medium|Low>", "data_readiness": "<High|Medium|Low>", "regulatory_clearance": "<High|Medium|Low>"}},
+      "adoption_mt": {{"tech_readiness": "<High|Medium|Low>", "change_readiness": "<High|Medium|Low>", "data_readiness": "<High|Medium|Low>", "regulatory_clearance": "<High|Medium|Low>"}},
+      "criticality": "<Core|Enabling|Non-core>",
+      "residual_nature": "<what human work remains after automation>",
+      "secondary_impacts": ["<upstream/downstream effect on other roles>"],
+      "confidence": "<High|Medium|Low>"
+    }}
+  ],
+  "strategic_value": "<Strategic|Core operational|Support|At-risk>",
+  "confidence": "<High|Medium|Low overall-model confidence>",
+  "assumptions": ["<explicit assumption you made>", "<...>"],
+  "gaps": ["<missing data that would improve this analysis>", "<...>"],
+  "exec_summary": ["<COMEX-ready capacity bullet>", "<max 5 bullets total>"],
+  "no_regret_moves": ["<low-risk capacity move for the next 0-6 months>", "<...>"]
+}}
+
+Rules:
+- automation_type: full = end-to-end automatable; ai_led = AI does most, human checks;
+  human_led = human does most, AI assists; human_only = no meaningful automation.
+- Adoption factors are framed so HIGH is most favourable to adoption: change_readiness High
+  means change is EASY; regulatory_clearance High means FEW regulatory blockers.
+- ST adoption should be <= MT adoption for the same task (capability and readiness grow).
+- time_allocation_pct across all tasks should sum to ~100 (flag in "assumptions" if uncertain).
+- exec_summary: at most 5 bullets, phrased as capacity observations, never as workforce actions.
+- Respect {label} labour-law realities when rating regulatory_clearance and change_readiness."""
+
+
 DISAMBIG_SYSTEM = """You are a market entity resolver. You distinguish between different
 real-world organisations that share a similar name. You always respond with valid, parseable
 JSON only - no markdown, no prose, no explanation. Raw JSON only."""
